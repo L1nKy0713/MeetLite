@@ -1,11 +1,11 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "published": "2026-11-07",
-  "notes": "1.0.1：自更新线路优化（jsDelivr + GitHub 代理测速择优），更新地址迁移修正。",
+  "notes": "1.0.2：新增性能基准脚本；Windows 版外壳与一键打包脚本（M3/M4）就位；首启动模型向导；whisper/llama 可执行文件支持随包 bin/ 目录查找。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.1/MeetLite-1.0.1.zip",
-    "size": 2239753,
-    "sha256": "9ecebe9ae0756a4d838bf8679bcf19a4848fdf26a5551f98efc64caac5486f17"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.2/MeetLite-1.0.2.zip",
+    "size": 1077587,
+    "sha256": "f6a329db698ab8e7735a2a7df6ee78077c3e7973d38df98b973981a787c49fd5"
   },
   "windows": {
     "url": "",

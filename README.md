@@ -174,6 +174,22 @@ cd /Users/yyl1nky/Documents/Projects/MeetLite
 | 纪要生成很慢 | 首次调用会和预热抢 CPU，头一份偏慢；之后短会约 20 秒、长会 1.5–3 分钟。确认 `/api/system` 的 `warm` 已是 `ready` |
 | 提示找不到模型 | Meetily 被删了或模型被移走，按上面表格放回去，或在 config.json 指定路径 |
 | 中文被转成英文 | `config.json` 的 `language` 设为 `zh`（默认已是） |
+
+## 性能基准
+
+`tools/bench.py` 把「识别 + 纪要」拆开计时，用来比较不同机器 / 不同模型规格：
+
+```bash
+python3 tools/bench.py                       # 用 /tmp/meeting_zh.wav
+python3 tools/bench.py --wav 你的录音.wav --repeat 3
+python3 tools/bench.py --lang en --tpl standard_meeting
+python3 tools/bench.py --skip-summary        # 只测转写
+```
+
+本机（M 系列 Mac，large-v3-turbo-q5_0 + Qwen3.5-2B-Q4_K_M）实测 55.7 秒中文录音：
+识别 15.9 秒（**RTF 0.287**，即一小时音频约 17 分钟转完）、出 221 字；
+纪要 59.4 秒、出 914 字（约 15 字/秒）。脚本末行打印 JSON，便于版本间对比。
+
 ## Windows 版进度
 
 | 阶段 | 内容 | 状态 |
@@ -181,9 +197,9 @@ cd /Users/yyl1nky/Documents/Projects/MeetLite
 | M0 | 平台差异层 `platforms.py`（数据目录 / 设备枚举 / 采集器 / 进程控制） | ✅ 已落地 |
 | M1 | `bin/loopcap/loopcap.cpp`：WASAPI loopback + 麦克风，内部混音，输出 16k mono s16le | ✅ 已交叉编译出 `dist/loopcap.exe`（需在 Windows 上实测） |
 | M2 | 采集层接入：`platforms.NATIVE_CAPTURE` + `Recorder.start()` 单进程路径 | ✅ 已落地 |
-| M3 | C# / .NET 8 + WebView2 原生外壳 | ⏳ 待做 |
-| M4 | `build-win.ps1` 打包 + 首启动模型向导（ModelScope 优先） | ⏳ 待做 |
-| M5 | Windows 上 whisper / llama 基准，定默认模型规格 | ⏳ 待做 |
+| M3 | C# / .NET 8 + WebView2 原生外壳（`windows/MeetLite.Win/`） | ✅ 已交叉编译出 `MeetLite.exe`（1.0 MB，需在 Windows 上实测） |
+| M4 | `windows/build-win.ps1` 打包 + 首启动模型向导 | ✅ 脚本与向导已落地（脚本需在 Windows 上跑一次） |
+| M5 | 基准脚本 `tools/bench.py` | ✅ 已跑出 macOS 数据；Windows 数据待实机补 |
 
 `loopcap.exe` 命令行：
 
@@ -196,3 +212,25 @@ loopcap.exe --in-device "{0.0.1.00000000}.{...}"   # 指定麦克风端点
 ```
 
 构建（macOS 上交叉编译）：`brew install mingw-w64 && bash bin/loopcap/build.sh`。
+
+### 在 Windows 上打包
+
+需要 .NET 8 SDK（`winget install Microsoft.DotNet.SDK.8`），PowerShell 里执行：
+
+```powershell
+cd windows
+.\build-win.ps1 -Version 1.1.0
+```
+
+脚本做六件事，产物是一个解压即用的目录 `dist\MeetLite-<版本>-win\` 加同名 zip：
+
+1. `dotnet publish` 出 `MeetLite.exe`（自包含关闭，只需系统装 WebView2 运行时；Win10/11 自带）。
+2. 下载 Python 3.11 embed 包解到 `runtime\`，并把 `python311._pth` 里补一行 `.`。
+3. 拷 `app\`：`server.py`、采集/模型/更新等模块、`static\`、`templates\`。
+4. `app\bin\` 放 `loopcap.exe` + `whisper-server.exe` + `llama-server.exe` 与其 dll
+   （从 whisper.cpp / llama.cpp 的 GitHub Release 拉，走 `ghfast.top` 等镜像回退）。
+5. 放图标与「使用说明.txt」。
+6. `Compress-Archive` 出 zip 并打印 size / sha256，填进 `update.json` 即可发版。
+
+离线打包：先手动把 `whisper-bin-x64.zip`、`llama-*-bin-win-cpu-x64.zip`、`python-3.11.9-embed-amd64.zip`
+放进 `%TEMP%\meetlite-cache\`，再 `build-win.ps1 -LocalCache`。

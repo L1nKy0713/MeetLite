@@ -8,7 +8,7 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 DATA_DIR = platforms.data_dir()
 MEETILY_DATA = (platforms.meetily_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()
