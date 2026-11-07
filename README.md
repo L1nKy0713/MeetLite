@@ -239,7 +239,38 @@ loopcap.exe --in-device "{0.0.1.00000000}.{...}"   # 指定麦克风端点
 
 ### 在 Windows 上使用
 
-Releases 里下 `MeetLite-1.0.3-win.zip`（23 MB，解压 49 MB），解压到任意目录，双击 `MeetLite.exe`：
+**一条命令部署（推荐）**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy-win.ps1
+```
+
+脚本会依次：检查 64 位 / 磁盘空间 → 从 gh-proxy → ghfast → 直连三个通道挑最快的下 `MeetLite-<版本>-win.zip`
+→ 校验 SHA-256 → 解压到 `%LOCALAPPDATA%\MeetLite` → 关掉旧实例并覆盖程序文件 → 校验 5 个关键文件
+→ 找模型（找不到就提示首次启动下载）→ 建桌面 / 开始菜单快捷方式 → 启动。
+
+常用参数：
+
+| 参数 | 作用 |
+| --- | --- |
+| `-Version 1.0.4` | 指定版本，默认 1.0.4 |
+| `-Url .\MeetLite-1.0.4-win.zip` | 用本地包或内网地址，跳过下载 |
+| `-ModelsFrom D:\models` | 从已有目录导入模型（挑最大 `.bin` / `.gguf`），离线机首选 |
+| `-AddDefenderExclusion` | 把安装目录加进 Defender 排除（需管理员，解决 loopcap 误报） |
+| `-Shortcut None` | 不建快捷方式；也可 `Desktop` / `StartMenu` |
+| `-NoLaunch` | 装完不启动 |
+| `-Uninstall` | 卸载（保留会议数据，加 `-PurgeData` 一并删） |
+
+批量部署（多台机器）示例：
+
+```powershell
+Invoke-WebRequest https://raw.githubusercontent.com/L1nKy0713/MeetLite/main/windows/deploy-win.ps1 -OutFile deploy-win.ps1
+.\deploy-win.ps1 -ModelsFrom \\fileserver\meetlite-models -AddDefenderExclusion -Shortcut Both -NoLaunch
+```
+
+**手工部署**
+
+Releases 里下 `MeetLite-1.0.4-win.zip`（23 MB，解压 49 MB），解压到任意目录，双击 `MeetLite.exe`：
 
 ```
 MeetLite.exe              81 KB   C# 外壳（.NET Framework 4.8，系统自带）
