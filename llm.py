@@ -37,6 +37,33 @@ def strip_think(text: str) -> str:
 class LocalLLM:
     """串行调用常驻 llama-server。"""
 
+    _flag_cache: dict[tuple[str, float], set[str]] = {}
+
+    @classmethod
+    def _supported_flags(cls, exe: str) -> set[str]:
+        """跑一次 `llama-server --help`，把输出里出现的开关名收集成集合。
+
+        结果按 (路径, mtime) 缓存 —— 换版本自动失效。任何异常都退化成
+        「空集合」，即只保留最核心的 -m/--host/--port 那批参数。
+        """
+        try:
+            key = (os.path.abspath(exe), os.path.getmtime(exe))
+        except OSError:
+            return set()
+        cached = cls._flag_cache.get(key)
+        if cached is not None:
+            return cached
+        flags: set[str] = set()
+        try:
+            r = subprocess.run([exe, "--help"], capture_output=True, timeout=30)
+            text = (r.stdout or b"").decode("utf-8", "replace") + \
+                   (r.stderr or b"").decode("utf-8", "replace")
+            flags = set(re.findall(r"(?<![\w-])(--?[A-Za-z][\w-]*)", text))
+        except Exception:
+            flags = set()
+        cls._flag_cache[key] = flags
+        return flags
+
     def __init__(self, cfg, log=print):
         self.cfg = cfg
         self.log = log
@@ -86,17 +113,35 @@ class LocalLLM:
             raise RuntimeError("未找到摘要模型，请在 config.json 设置 summary_model")
         exe = self.cfg.get("llama_server")
         if not exe or not os.path.isfile(exe):
-            raise RuntimeError("未找到 llama-server（brew install llama.cpp）")
+            raise RuntimeError(
+                "未找到 llama-server。macOS: brew install llama.cpp；"
+                "Windows: 把 llama-server.exe 放进 app\\bin\\ 目录（安装包已自带）。"
+            )
 
         cmd = [
             exe, "-m", model,
             "--host", "127.0.0.1", "--port", str(self.port),
             "-c", str(int(self.cfg.get("llm_context") or 8192)),
             "-t", str(int(self.cfg.get("llm_threads") or 6)),
-            "-ngl", "99", "-fa", "auto",
-            "--jinja", "--reasoning-budget", "0",
-            "--no-webui", "-np", "1",
+            "-ngl", "99", "-np", "1",
         ]
+        # 下面这些开关只有较新的 llama.cpp 才有；老版本（例如 Windows 包用的
+        # b6000）遇到未知参数会直接以 "error: invalid argument" 退出，
+        # 整台机器上摘要功能就全废了。所以先问一遍 --help，只拼受支持的。
+        supported = self._supported_flags(exe)
+        for flag, value in (("-fa", "auto"), ("--jinja", None),
+                            ("--reasoning-budget", "0"), ("--no-webui", None)):
+            if flag not in supported:
+                continue
+            cmd.append(flag)
+            if value is not None:
+                cmd.append(value)
+        if "--reasoning-budget" not in supported:
+            # 没有该开关时靠请求体里的 chat_template_kwargs.enable_thinking=false
+            # 关掉思考链，strip_think 再兜一层。
+            self.log("[llm] 该版本无 --reasoning-budget，改用请求体抑制思考链")
+        if "-fa" not in supported and "--flash-attn" not in supported:
+            self.log("[llm] 该版本无 flash-attn 开关，跳过")
         self.log("启动 " + " ".join(cmd[:4]) + " …")
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.DEVNULL,

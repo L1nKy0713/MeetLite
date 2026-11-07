@@ -54,6 +54,26 @@ def model_dirs() -> list[Path]:
 
 # ---------------------------------------------------------------- 系统声采集
 
+def find_bin(name: str) -> str | None:
+    """在程序目录里找可执行文件。
+
+    布局：bin/<name>（macOS 常用），或 bin/whisper/<name>、bin/llama/<name>
+    ——Windows 包里 whisper 与 llama 各自带同名 ggml*.dll，必须分目录，
+    否则后拷的会覆盖前一个，导致其中一个引擎加载失败。"""
+    exe = name if name.lower().endswith((".exe", "")) and not IS_WIN else name
+    for cand in (name, name + ".exe"):
+        direct = HERE / "bin" / cand
+        if direct.is_file():
+            return str(direct)
+        if (HERE / "bin").is_dir():
+            for d in sorted((HERE / "bin").iterdir()):
+                if d.is_dir():
+                    hit = d / cand
+                    if hit.is_file():
+                        return str(hit)
+    return None
+
+
 def system_capture_bin() -> Path:
     return HERE / "bin" / ("loopcap.exe" if IS_WIN else "audiocap")
 

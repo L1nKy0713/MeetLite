@@ -8,7 +8,7 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 DATA_DIR = platforms.data_dir()
 MEETILY_DATA = (platforms.meetily_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()
@@ -112,9 +112,9 @@ def _find_helper() -> str | None:
 
 
 def _find_llama_server() -> str | None:
-    local = Path(__file__).resolve().parent / "bin" / platforms.exe_name("llama-server")
-    if local.is_file():
-        return str(local)
+    local = platforms.find_bin("llama-server")
+    if local:
+        return local
     found = shutil.which(platforms.exe_name("llama-server")) or shutil.which("llama-server")
     if found:
         return found

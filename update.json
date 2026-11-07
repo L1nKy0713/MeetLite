@@ -1,15 +1,15 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "published": "2026-11-07",
-  "notes": "1.0.2：新增性能基准脚本；Windows 版外壳与一键打包脚本（M3/M4）就位；首启动模型向导；whisper/llama 可执行文件支持随包 bin/ 目录查找。",
+  "notes": "1.0.3：Windows 外壳改用系统自带的 .NET Framework 4.8（Win10/11 双击即用，无需装运行时）；缺 WebView2 时自动降级为系统浏览器；whisper 与 llama 分目录，避免 ggml 同名 dll 互相覆盖；导入音频内置纯标准库解码回退；报错文案跨平台化。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.2/MeetLite-1.0.2.zip",
-    "size": 1077587,
-    "sha256": "f6a329db698ab8e7735a2a7df6ee78077c3e7973d38df98b973981a787c49fd5"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.3/MeetLite-1.0.3.zip",
+    "size": 1090854,
+    "sha256": "7ed8e827b067ac128596b884ed006ff749036804c84a29e58cc66a0872aef2f2"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.2/MeetLite-1.0.2-win.zip",
-    "size": 23704685,
-    "sha256": "4b80b5509b61a045785d7b74e92f45d5021f693757dfcd678240d4dd17b62a1b"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.3/MeetLite-1.0.3-win.zip",
+    "size": 22981958,
+    "sha256": "e3cdb994e31ee32bff7933a1d61e12fcb5f3ca28cb90124674fc2887687f14ce"
   }
 }

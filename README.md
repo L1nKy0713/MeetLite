@@ -170,7 +170,7 @@ cd /Users/yyl1nky/Documents/Projects/MeetLite
 | 现象 | 处理 |
 | --- | --- |
 | 录了几分钟没有转写 | 看电平条是否在动；不动就换来源/设备，或把灵敏度调到「高」；系统声需屏幕录制权限 |
-| 系统声提示需要权限 | 点黄条「去授权」，勾选 MeetLite，**退出并重开应用**（TCC 权限只在启动时读取） |
+| 系统声提示需要权限 | 点黄条「去授权」，勾选 MeetLite，**退出并重开应用**（TCC 权限只在启动时读取）。自更新换过包之后系统会把它当成新程序，屏幕录制授权需要再勾一次——这是 macOS 的机制，不是 bug |
 | 纪要生成很慢 | 首次调用会和预热抢 CPU，头一份偏慢；之后短会约 20 秒、长会 1.5–3 分钟。确认 `/api/system` 的 `warm` 已是 `ready` |
 | 提示找不到模型 | Meetily 被删了或模型被移走，按上面表格放回去，或在 config.json 指定路径 |
 | 中文被转成英文 | `config.json` 的 `language` 设为 `zh`（默认已是） |
@@ -195,15 +195,27 @@ python3 tools/bench.py --skip-summary        # 只测转写
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | M0 | 平台差异层 `platforms.py`（数据目录 / 设备枚举 / 采集器 / 进程控制） | ✅ 已落地 |
-| M1 | `bin/loopcap/loopcap.cpp`：WASAPI loopback + 麦克风，内部混音，输出 16k mono s16le | ✅ `dist/loopcap.exe` 3.6 MB；PE 导入表仅 kernel32/ole32/UCRT，静态链接无额外 dll |
+| M1 | `bin/loopcap/loopcap.cpp`：WASAPI loopback + 麦克风，内部混音，输出 16k mono s16le | ✅ `dist/loopcap.exe` 3.6 MB，静态链接无额外 dll 依赖 |
 | M2 | 采集层接入：`platforms.NATIVE_CAPTURE` + `Recorder.start()` 单进程路径 | ✅ 已落地 |
-| M3 | C# / .NET 8 + WebView2 原生外壳（`windows/MeetLite.Win/`） | ✅ `MeetLite.exe` 1.0 MB，已交叉编译；任务栏/托盘、Job 对象杀进程树、深色标题栏 |
-| M4 | `windows/build-win.ps1` 打包 + 首启动模型向导 | ✅ 已按脚本流程产出 `MeetLite-1.0.2-win.zip`（87 文件 / 23.7 MB） |
+| M3 | C# `.NET Framework 4.8` + WebView2 原生外壳（`windows/MeetLite.Win/`） | ✅ `MeetLite.exe` 81 KB，交叉编译通过 |
+| M4 | `windows/build-win.ps1` 打包 + 首启动模型向导 | ✅ 已产出 `MeetLite-1.0.3-win.zip`（23 MB / 解压 49 MB） |
 | M5 | 基准脚本 `tools/bench.py` | ✅ 已跑出 macOS 数据（RTF 0.287）；Windows 数据待实机补 |
+
+三个当初的坑，最后都是这么解决的：
+
+- **不要 .NET 8**。目标框架改 `net48`——Win10/11 自带 .NET Framework 4.8，双击就跑，
+  不需要用户再装几十 MB 的桌面运行时。代价是 `ProcessStartInfo.ArgumentList`、
+  `Process.Kill(entireProcessTree)`、`TakeLast`、`ApplicationConfiguration.Initialize()`
+  这些 .NET Core 专有 API 要换写法（`dotnet build` 会在编译期全部报出来）。
+- **VC++ 运行时**。上游 whisper.cpp / llama.cpp 的官方 exe 是 MSVC 动态链接，缺
+  `msvcp140.dll` 等就会 `0xc0000135` 静默退出。`windows/redist/` 里固化了一份从
+  `vc_redist.x64.exe` 里取出的 x64 运行时（4 个 dll），打包时放进 `app\bin\`。
+- **dll 同名冲突**。whisper.cpp 与 llama.cpp 都带 `ggml.dll` / `ggml-base.dll` / `SDL2.dll`，
+  平铺在同一个目录会互相覆盖，结果其中一个引擎加载失败。现在两个引擎各自一个子目录：
+  `app\bin\whisper\`、`app\bin\llama\`，`platforms.find_bin()` 会往这两层找。
 
 采集层契约已在 macOS 上用等价 stub 实测：`--list` 解析出 capture 端点 → 拼 `--mode mix --in-device`
 → Recorder 收到 16k mono s16le → 切段 → 直喂 whisper 出中文字幕，位序与采样率都正确。
-剩下的就是把整包丢进真机 Windows 跑一遍。
 
 `loopcap.exe` 命令行：
 
@@ -219,43 +231,51 @@ loopcap.exe --in-device "{0.0.1.00000000}.{...}"   # 指定麦克风端点
 
 ### 在 Windows 上使用
 
-Releases 里直接下 `MeetLite-1.0.2-win.zip`（23.7 MB，解压即用，共 87 个文件）：
+Releases 里下 `MeetLite-1.0.3-win.zip`（23 MB，解压 49 MB），解压到任意目录，双击 `MeetLite.exe`：
 
 ```
-MeetLite.exe              1.0 MB  C# / .NET 8 + WebView2 外壳
+MeetLite.exe              81 KB   C# 外壳（.NET Framework 4.8，系统自带）
+MeetLite.exe.config
+Microsoft.Web.WebView2.Core.dll
+Microsoft.Web.WebView2.WinForms.dll
 WebView2Loader.dll
 meetlite.ico
-使用说明.txt
-app\                        Python 后端（server/capture/config/llm/store/summarize/…）
-  bin\loopcap.exe          3.6 MB  WASAPI loopback + 麦克风采集（静态链接，无额外 dll 依赖）
-  bin\whisper-server.exe   whisper.cpp v1.8.2（x64 CPU）
-  bin\llama-server.exe     llama.cpp b6000（x64 CPU）
+app\                        Python 后端
+  bin\loopcap.exe          3.6 MB  WASAPI loopback + 麦克风采集
+  bin\whisper\             whisper.cpp v1.8.2（whisper-server.exe + ggml*.dll）
+  bin\llama\               llama.cpp b6000（llama-server.exe + ggml*.dll）
+  bin\msvcp140*.dll         VC++ x64 运行时（4 个）
   static\ templates\
-runtime\                    Python 3.11.9 embeddable（含 stdlib zip、ssl、vcruntime）
+runtime\                    Python 3.11.9 embeddable
+使用说明.txt
 ```
 
-首次运行：双击 `MeetLite.exe` → 向导里下载两个模型（hf-mirror，断点续传 + sha256）→ 开始录音。
+首次运行：双击 → 向导里下载两个模型（hf-mirror，断点续传 + sha256）→ 开始录音。
 系统声走 WASAPI loopback，不需要虚拟声卡、不需要管理员权限；麦克风与系统声在 `loopcap.exe`
-内部混成一路 16k mono s16le 再喂 whisper，所以界面上的三个声源档位在 Windows 上同样可用。
+内部混成一路 16k mono s16le 再喂 whisper，界面上三个声源档位在 Windows 上同样可用。
 
-已知限制：Windows 外壳与 `build-win.ps1` 目前只做到「能交叉编译、能打包、采集层契约在 macOS 上
-用等价 stub 实测通过」，还没在真机 Windows 上跑过一遍（本机没有 Windows 环境）。
+**没有 WebView2 也不影响使用**：外壳会捕获 `CoreWebView2Environment.CreateAsync` 的异常，
+自动改用系统浏览器打开 `http://127.0.0.1:<端口>/`，窗口收到托盘，功能完全一致；
+装一次 [WebView2 Runtime](https://go.microsoft.com/fwlink/p/?LinkId=2124703) 之后就是内置窗口。
+
+已知限制：整套 Windows 支持只做到「能交叉编译、能打包、采集层契约在 macOS 上用等价 stub
+实测通过」，还没在真机 Windows 上跑过（开发机没有 Windows 环境）。
 
 ### 自己打包（Windows 上）
 
-需要 .NET 8 SDK（`winget install Microsoft.DotNet.SDK.8`），PowerShell 里执行：
+需要 .NET SDK（`winget install Microsoft.DotNet.SDK`，只用于编译，产物不依赖它），PowerShell 里执行：
 
 ```powershell
 cd windows
 .\build-win.ps1 -Version 1.1.0
 ```
 
-脚本做六件事，产物是一个解压即用的目录 `dist\MeetLite-<版本>-win\` 加同名 zip：
+脚本做六件事，产物是解压即用的目录 `dist\MeetLite-<版本>-win\` 加同名 zip：
 
-1. `dotnet publish` 出 `MeetLite.exe`（自包含关闭，只需系统装 WebView2 运行时；Win10/11 自带）。
-2. 下载 Python 3.11 embed 包解到 `runtime\`，并把 `python311._pth` 里补一行 `.`。
+1. `dotnet build` 出 `MeetLite.exe`（net48，不发布自包含运行时）。
+2. 下载 Python 3.11 embed 包解到 `runtime\`。
 3. 拷 `app\`：`server.py`、采集/模型/更新等模块、`static\`、`templates\`。
-4. `app\bin\` 放 `loopcap.exe` + `whisper-server.exe` + `llama-server.exe` 与其 dll。
+4. `app\bin\` 放 `loopcap.exe` + VC++ 运行时；引擎分别放 `app\bin\whisper\`、`app\bin\llama\`。
 5. 放图标与「使用说明.txt」。
 6. `Compress-Archive` 出 zip 并打印 size / sha256，填进 `update.json` 即可发版。
 
@@ -266,9 +286,9 @@ cd windows
 | whisper.cpp | `v1.8.2`（latest v1.9.5 无资产） | `whisper-bin-x64.zip` 3.8 MB |
 | llama.cpp | `b6000`（latest v0.9.0 只有 nightly-tag.txt） | `llama-b6000-bin-win-cpu-x64.zip` 14.4 MB |
 | Python | 3.11.9 | `python-3.11.9-embed-amd64.zip` 11.2 MB |
+| VC++ 运行时 | — | 从 `vc_redist.x64.exe` 抽取，已固化在 `windows/redist/` |
 
-下载顺序是 `gh-proxy.com` → `ghfast.top` → 直连（实测 ghfast.top 对 release 资产回 403，
-github.com 直连在本机被重置）。
+下载顺序是 `gh-proxy.com` → `ghfast.top` → 直连（实测 ghfast.top 对 release 资产回 403）。
 
 离线打包：先手动把上面三个 zip 放进 `%TEMP%\meetlite-cache\`（文件名分别为
 `whisper-bin-x64.zip`、`llama-win-x64.zip`、`python-embed.zip`），再 `build-win.ps1 -LocalCache`。

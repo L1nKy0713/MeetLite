@@ -19,6 +19,7 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import audiodec
 import config as config_mod
 import platforms
 import store as store_mod
@@ -245,17 +246,13 @@ class App:
         threading.Thread(target=self._import_worker, args=(mid, path, name), daemon=True).start()
 
     def _import_worker(self, mid, path, name):
-        tmp = tempfile.mktemp(suffix=".wav", dir=tempfile.gettempdir())
         try:
             self.broadcast(mid, {"type": "progress", "phase": "import", "text": "解码音频…", "ratio": 0})
-            subprocess.run(
-                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", path,
-                 "-ac", "1", "-ar", "16000", tmp],
-                check=True, capture_output=True,
+            # wav 走标准库，其它格式交给 ffmpeg（Windows 包默认不带 ffmpeg）
+            pcm = audiodec.to_pcm16k(
+                path,
+                on_note=lambda msg: self.broadcast(mid, {"type": "notice", "message": msg}),
             )
-            with open(tmp, "rb") as f:
-                f.seek(44)
-                pcm = f.read()
             chunk_bytes = 16000 * 2 * 30
             chunks = [pcm[i:i + chunk_bytes] for i in range(0, len(pcm), chunk_bytes)]
             total = len(chunks)
@@ -272,10 +269,6 @@ class App:
             self.broadcast(mid, {"type": "error", "message": f"导入失败: {e}"})
         finally:
             self.busy["import"] = False
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
             try:
                 os.unlink(path)
             except OSError:
@@ -814,7 +807,7 @@ def main():
         print("找不到摘要模型（.gguf）")
         sys.exit(1)
     if not cfg.get("llama_server"):
-        print("找不到 llama-server，请 brew install llama.cpp")
+        print("找不到 llama-server：macOS 用 brew install llama.cpp，或把可执行文件放进 bin/ 目录")
 
     global APP
     APP = App(cfg)

@@ -3,6 +3,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -13,10 +14,16 @@ namespace MeetLite.Win;
 
 internal static class Program
 {
+    [DllImport("shcore.dll")]
+    private static extern int SetProcessDpiAwareness(int value);
+
     [STAThread]
     private static void Main()
     {
-        ApplicationConfiguration.Initialize();
+        // net48 没有 ApplicationConfiguration.Initialize()，等价写法：
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        try { SetProcessDpiAwareness(2); } catch { }   // PerMonitorV2
         using var shell = new Shell();
         Application.Run(shell);
     }
@@ -36,6 +43,8 @@ internal sealed class Shell : ApplicationContext
     private int _port;
     private bool _webReady;
     private bool _serverReady;
+    private bool _useBrowser;      // 缺 WebView2 时退化为系统浏览器
+    private bool _browserOpened;
     private bool _exiting;
 
     public Shell()
@@ -60,6 +69,8 @@ internal sealed class Shell : ApplicationContext
         _splash.BackColor = Color.FromArgb(247, 246, 243);
         _splash.Font = new Font("Microsoft YaHei UI", 11f);
         _splash.Text = "正在启动转写与摘要服务…";
+        _splash.Cursor = Cursors.Hand;
+        _splash.Click += (_, _) => { if (_useBrowser && _serverReady) OpenExternal($"http://127.0.0.1:{_port}/"); };
         _win.Controls.Add(_splash);
 
         _web.Dock = DockStyle.Fill;
@@ -131,17 +142,46 @@ internal sealed class Shell : ApplicationContext
         }
         catch (Exception ex)
         {
-            Fail("WebView2 运行库不可用：" + ex.Message +
-                 Environment.NewLine + "请安装 Microsoft Edge WebView2 Runtime 后重试。");
+            // 缺 WebView2 运行库是常见情况（精简版 Windows、未装 Edge）
+            // 不直接失败，退化成「系统浏览器 + 托盘常驻」，界面功能完全一致
+            Append("[webview] " + ex.Message);
+            _useBrowser = true;
+            Append("[webview] 回退到系统浏览器模式");
+            UiInvoke(() =>
+            {
+                _splash.Text = "未找到 WebView2 运行库，正在用系统浏览器打开界面…";
+                _web.Visible = false;
+                _splash.Visible = true;
+            });
+            TryShowUI();
         }
     }
 
     private void TryShowUI()
     {
-        if (!_webReady || !_serverReady || _exiting) return;
+        if (_exiting || !_serverReady) return;
+        var url = $"http://127.0.0.1:{_port}/";
+
+        if (_useBrowser)
+        {
+            if (_browserOpened) return;
+            _browserOpened = true;
+            OpenExternal(url);
+            _win.Hide();
+            try
+            {
+                _tray.ShowBalloonTip(4000, "MeetLite 已在浏览器中打开",
+                    "缺少 WebView2 运行库，已改用系统浏览器。装好运行时后重开即是内置窗口。",
+                    ToolTipIcon.Info);
+            }
+            catch { }
+            return;
+        }
+
+        if (!_webReady) return;
         _splash.Visible = false;
         _web.Visible = true;
-        _web.Source = new Uri($"http://127.0.0.1:{_port}/");
+        _web.Source = new Uri(url);
     }
 
     // ---------------------------------------------------------------- 后端
@@ -171,10 +211,7 @@ internal sealed class Shell : ApplicationContext
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
             };
-            psi.ArgumentList.Add("-u");
-            psi.ArgumentList.Add("server.py");
-            psi.ArgumentList.Add("--port");
-            psi.ArgumentList.Add(_port.ToString());
+            psi.Arguments = $"-u server.py --port {_port}";
             psi.Environment["PYTHONIOENCODING"] = "utf-8";
             psi.Environment["PYTHONUTF8"] = "1";
 
@@ -277,7 +314,7 @@ internal sealed class Shell : ApplicationContext
     {
         _exiting = true;
         try { _server?.StandardInput.Close(); } catch { }
-        try { if (_server is { HasExited: false }) _server.Kill(entireProcessTree: true); } catch { }
+        try { if (_server is { HasExited: false }) _server.Kill(); } catch { }
         if (_job != IntPtr.Zero) { CloseHandle(_job); _job = IntPtr.Zero; }
         _tray.Visible = false;
         _web.Dispose();
@@ -321,7 +358,7 @@ internal sealed class Shell : ApplicationContext
         lock (_log)
         {
             var lines = _log.ToString().Split('\n');
-            return string.Join(Environment.NewLine, lines.TakeLast(8));
+            return string.Join(Environment.NewLine, lines.Skip(Math.Max(0, lines.Length - 8)));
         }
     }
 
@@ -353,18 +390,72 @@ internal sealed class Shell : ApplicationContext
     [DllImport("kernel32.dll")]
     private static extern bool CloseHandle(IntPtr h);
 
+    // x64 布局（sizeof 144）：
+    //   BasicLimitInformation 0..63（LimitFlags 在 16）
+    //   IoCounters 64..111
+    //   ProcessMemoryLimit 112 / JobMemoryLimit 120
+    //   PeakProcessMemoryUsed 128 / PeakJobMemoryUsed 136
+    // 必须用结构体而不是手写偏移：早先写成 WriteInt64(info,128,0x2000)，
+    // 把 0x2000 写进了 PeakProcessMemoryUsed，LimitFlags 仍是 0，
+    // KILL_ON_JOB_CLOSE 根本没生效 —— 关窗后 python 进程会留下来。
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IO_COUNTERS
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    {
+        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+        public IO_COUNTERS IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
+    }
+
+    private const int JobObjectExtendedLimitInformation = 9;
+    private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+    private const uint JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION = 0x0400;
+
     private void CreateKillOnCloseJob()
     {
         _job = CreateJobObject(IntPtr.Zero, null);
         if (_job == IntPtr.Zero) return;
-        var info = Marshal.AllocHGlobal(144);
+        var info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+        info.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+        var size = Marshal.SizeOf<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>();
+        var buf = Marshal.AllocHGlobal(size);
         try
         {
-            for (var i = 0; i < 144; i++) Marshal.WriteByte(info, i, 0);
-            Marshal.WriteInt64(info, 128, 0x2000);   // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-            SetInformationJobObject(_job, 9, info, 144);
+            Marshal.StructureToPtr(info, buf, false);
+            if (!SetInformationJobObject(_job, JobObjectExtendedLimitInformation, buf, size))
+                Append("[job] SetInformationJobObject failed: err=" + Marshal.GetLastWin32Error());
+            else
+                Append("[job] kill-on-close armed (" + size + " bytes)");
         }
-        finally { Marshal.FreeHGlobal(info); }
+        finally { Marshal.FreeHGlobal(buf); }
     }
 
     private void AssignToJob(Process p)

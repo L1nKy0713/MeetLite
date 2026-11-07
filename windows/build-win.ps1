@@ -68,6 +68,13 @@ if (-not (Test-Path $Loop)) { $Loop = Join-Path $Root 'bin\loopcap\build\loopcap
 if (-not (Test-Path $Loop)) { throw "找不到 loopcap.exe，先跑 bash bin/loopcap/build.sh" }
 Copy-Item $Loop "$Stage\app\bin\loopcap.exe" -Force
 
+# VC++ 运行时：上游 whisper/llama 官方包是 MSVC 动态链接，缺这几个 dll 会 0xc0000135
+$Redist = Join-Path $Root 'windows\redist'
+if (Test-Path $Redist) {
+    Get-ChildItem $Redist -Filter *.dll | ForEach-Object { Copy-Item $_.FullName "$Stage\app\bin\" -Force }
+    Write-Host "      VC++ 运行时 x64：$((Get-ChildItem $Redist -Filter *.dll).Count) 个"
+}
+
 function Get-GithubZip($pattern, $dest) {
     # 依次试 GitHub 直连与常见反代
     # 反代优先：直连在中国大陆经常被重置，ghfast.top 对 release 资产会回 403
@@ -112,8 +119,10 @@ if (-not (Test-Path $WhisperZip)) {
 }
 $tmp = Join-Path $Out '_whisper'
 Expand-Archive $WhisperZip -DestinationPath $tmp -Force
+# whisper 与 llama 各自带同名 ggml*.dll，必须分目录放，否则互相覆盖
+New-Item -ItemType Directory -Force -Path "$Stage\app\bin\whisper" | Out-Null
 Get-ChildItem $tmp -Recurse -Include 'whisper-server.exe','whisper-cli.exe','*.dll' |
-    ForEach-Object { Copy-Item $_.FullName "$Stage\app\bin\" -Force }
+    ForEach-Object { Copy-Item $_.FullName "$Stage\app\bin\whisper\" -Force }
 Remove-Item $tmp -Recurse -Force
 
 $LlamaZip = Join-Path $CacheDir 'llama-win-x64.zip'
@@ -126,8 +135,9 @@ if (-not (Test-Path $LlamaZip)) {
 }
 $tmp = Join-Path $Out '_llama'
 Expand-Archive $LlamaZip -DestinationPath $tmp -Force
+New-Item -ItemType Directory -Force -Path "$Stage\app\bin\llama" | Out-Null
 Get-ChildItem $tmp -Recurse -Include 'llama-server.exe','*.dll' |
-    ForEach-Object { Copy-Item $_.FullName "$Stage\app\bin\" -Force }
+    ForEach-Object { Copy-Item $_.FullName "$Stage\app\bin\llama\" -Force }
 Remove-Item $tmp -Recurse -Force
 
 # ---------------------------------------------------------------- 5. 图标与清单
@@ -141,6 +151,18 @@ MeetLite $Version（绿色版）
 数据与模型目录：%APPDATA%\MeetLite
 日志：%APPDATA%\MeetLite\server.log
 卸载：直接删除本目录。
+
+常见问题
+- 双击没反应 / 窗口白屏：多半是缺 WebView2 运行时。装一次
+  https://go.microsoft.com/fwlink/p/?LinkId=2124703 （Evergreen Bootstrapper），
+  或把 MicrosoftEdgeWebView2RuntimeInstallerX64.exe 放进本目录后运行一次。
+- 提示 0xc0000135 / 缺少 msvcp140.dll：本包的 app\bin\ 已自带 VC++ 运行时四个 dll，
+  若被清理软件删掉，可从 windows\redist\ 重新拷回。
+- 导入了 mp3/m4a 却报解码失败：本包不含 ffmpeg，把 ffmpeg.exe 放进 app\bin\ 即可。
+  录会议本身不需要 ffmpeg（系统声由 loopcap.exe 直接采集）。
+- 系统声录不到：Windows 设置 → 隐私和安全性 → 麦克风，允许桌面应用访问麦克风；
+  播报类应用（Teams/腾讯会议/浏览器）保持正常音量即可，loopcap 走 WASAPI loopback，
+  不需要装虚拟声卡，也不需要管理员权限。
 "@ | Set-Content "$Stage\使用说明.txt" -Encoding UTF8
 
 # ---------------------------------------------------------------- 6. 打包

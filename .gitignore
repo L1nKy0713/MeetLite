@@ -35,3 +35,7 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+# Windows 构建产物
+windows/MeetLite.Win/bin/
+windows/MeetLite.Win/obj/
+*.pdb

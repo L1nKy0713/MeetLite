@@ -43,9 +43,9 @@ class WhisperEngine:
         b = self.cfg.get("whisper_server") or "whisper-server"
         if os.path.isabs(b):
             return b if os.path.isfile(b) else None
-        local = Path(__file__).resolve().parent / "bin" / platforms.exe_name(b)
-        if local.is_file():
-            return str(local)
+        local = platforms.find_bin(b)
+        if local:
+            return local
         return shutil.which(b) or shutil.which(platforms.exe_name(b))
 
     def _alive(self) -> bool:
@@ -65,7 +65,10 @@ class WhisperEngine:
             raise RuntimeError("未找到 whisper 模型，请在 config.json 里设置 whisper_model")
         bin_path = self._binary()
         if not bin_path:
-            raise RuntimeError("未找到 whisper-server，请先执行：brew install whisper-cpp")
+            raise RuntimeError(
+                "未找到 whisper-server。macOS: brew install whisper-cpp；"
+                "Windows: 把 whisper-server.exe 放进 app\\bin\\ 目录（安装包已自带）。"
+            )
         if self._alive():
             self.ready = True
             self.proc = None          # 复用已有服务，不再重复加载模型
