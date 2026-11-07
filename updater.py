@@ -445,7 +445,7 @@ def download_and_stage(version_hint: str = "", url: str | None = None) -> dict:
         name = os.path.basename(link.split("?")[0]) or f"MeetLite-{remote}.zip"
         zip_path = UPDATE_DIR / name
         with _LOCK:
-            PROGRESS.update(running=True, phase="download", done=0, total=int(asset.get("size") or 0),
+            PROGRESS.update(running=True, phase="download", done=0, staged="", zip="", total=int(asset.get("size") or 0),
                             error="", message=remote, version=remote)
         _download(link, zip_path, expect=int(asset.get("size") or 0))
         with _LOCK:
@@ -473,7 +473,8 @@ def download_and_stage(version_hint: str = "", url: str | None = None) -> dict:
         work = Path(tempfile.mkdtemp(prefix="update_", dir=str(UPDATE_DIR)))
         staged = _unpack(zip_path, work)
         with _LOCK:
-            PROGRESS.update(running=False, phase="ready", message=remote)
+            PROGRESS.update(running=False, phase="ready", message=remote,
+                            staged=str(staged), zip=str(zip_path), version=remote)
         return {"ok": True, "version": remote, "staged": str(staged), "zip": str(zip_path),
                 "sha256": got, "notes": man.get("notes") or ""}
     except Exception as e:
