@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import shutil
 import subprocess
@@ -108,22 +109,15 @@ def _get_one(url: str, timeout: float = 8.0) -> dict:
 
 
 def mirrors(url: str) -> list[str]:
-    """同一份清单的多个可达地址。国内直连 GitHub raw 常被拖到超时，
-    因此默认用 jsDelivr CDN，并自动派生其它 CDN / raw 变体做降级。"""
+    """同一份清单的多个可达地址。国内直连 GitHub raw 常被拖到超时，因此同时
+    给出 jsDelivr 各 CDN 与 raw 变体；check() 会并行取，选版本号最大的那份，
+    这样即使 CDN 缓存了旧清单也不会漏掉新版本。"""
     out = [url]
-    # jsDelivr 对分支引用有 CDN 缓存（最长数小时），带时间戳可强制回源拿最新清单
-    if "jsdelivr.net/gh/" in url:
-        sep = "&" if "?" in url else "?"
-        out.insert(0, f"{url}{sep}t={int(time.time())}")
     gh = re.match(r"^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$", url)
     jsd = re.match(r"^https://[a-z0-9.]*jsdelivr\.net/gh/([^/]+)/([^/@]+)@([^/]+)/(.+)$", url)
-    if gh:
-        user, repo, branch, path = gh.groups()
-        hosts = ["https://fastly.jsdelivr.net", "https://cdn.jsdelivr.net",
-                 "https://gcore.jsdelivr.net", "https://testingcf.jsdelivr.net"]
-        out += [f"{h}/gh/{user}/{repo}@{branch}/{path}" for h in hosts]
-    elif jsd:
-        user, repo, branch, path = jsd.groups()
+    m = gh or jsd
+    if m:
+        user, repo, branch, path = m.groups()
         hosts = ["https://fastly.jsdelivr.net", "https://cdn.jsdelivr.net",
                  "https://gcore.jsdelivr.net", "https://testingcf.jsdelivr.net"]
         out += [f"{h}/gh/{user}/{repo}@{branch}/{path}" for h in hosts]
@@ -131,17 +125,33 @@ def mirrors(url: str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
-def _get_json(url: str, timeout: float = 8.0) -> dict:
-    errs = []
-    for u in mirrors(url):
-        for attempt in (1, 2):
-            try:
-                return _get_one(u, timeout=timeout)
-            except Exception as e:  # noqa: BLE001 - 逐个镜像降级
-                errs.append(f"{u.split('/')[2]}: {type(e).__name__}")
-                if attempt == 1:
-                    time.sleep(0.6)
-    raise RuntimeError(" / ".join(errs[-4:]))
+def _get_manifest(url: str, timeout: float = 10.0) -> dict:
+    """并行拉取所有镜像，返回版本号最高的清单（避免 CDN 旧缓存遮蔽新版）。"""
+    cands = mirrors(url)
+    best: dict | None = None
+    errs: list[str] = []
+    ex = ThreadPoolExecutor(max_workers=max(1, min(6, len(cands))))
+    try:
+        futs = {ex.submit(_get_one, u, timeout): u for u in cands}
+        try:
+            for f in as_completed(futs, timeout=timeout + 4):
+                try:
+                    m = f.result()
+                except Exception as e:  # noqa: BLE001 - 单源失败不影响其它
+                    errs.append(f"{futs[f].split('/')[2]}: {type(e).__name__}")
+                    continue
+                v = str(m.get("version") or "").strip()
+                if not v:
+                    continue
+                if best is None or _tuple(v) > _tuple(str(best.get("version") or "0")):
+                    best = m
+        except TimeoutError:
+            errs.append("并行拉取超时")
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+    if best is not None:
+        return best
+    raise RuntimeError(" / ".join(errs[-4:]) or "所有镜像均不可用")
 
 
 def check(url: str | None = None) -> dict:
@@ -152,7 +162,7 @@ def check(url: str | None = None) -> dict:
     with _LOCK:
         PROGRESS.update(running=True, phase="check", done=0, total=0, error="", message="", version="")
     try:
-        man = _get_json(src)
+        man = _get_manifest(src)
     except urllib.error.HTTPError as e:
         return _fail(f"更新清单返回 {e.code}")
     except Exception as e:  # 网络超时 / DNS / JSON
@@ -374,7 +384,7 @@ def download_and_stage(version_hint: str = "", url: str | None = None) -> dict:
     cfg = config_mod.load()
     src = (url or cfg.get("update_url") or "").strip()
     try:
-        man = _get_json(src)
+        man = _get_manifest(src)
         remote = str(man.get("version") or version_hint or "").strip()
         asset = man.get(platform_key()) or {}
         link = (asset.get("url") or "").strip()
