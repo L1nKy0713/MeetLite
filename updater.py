@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import concurrent.futures
 import threading
 import urllib.error
 import re
@@ -110,6 +111,10 @@ def mirrors(url: str) -> list[str]:
     """同一份清单的多个可达地址。国内直连 GitHub raw 常被拖到超时，
     因此默认用 jsDelivr CDN，并自动派生其它 CDN / raw 变体做降级。"""
     out = [url]
+    # jsDelivr 对分支引用有 CDN 缓存（最长数小时），带时间戳可强制回源拿最新清单
+    if "jsdelivr.net/gh/" in url:
+        sep = "&" if "?" in url else "?"
+        out.insert(0, f"{url}{sep}t={int(time.time())}")
     gh = re.match(r"^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$", url)
     jsd = re.match(r"^https://[a-z0-9.]*jsdelivr\.net/gh/([^/]+)/([^/@]+)@([^/]+)/(.+)$", url)
     if gh:
@@ -233,21 +238,50 @@ def _pull(url: str, part: Path) -> None:
                 PROGRESS["done"] = have
 
 
+def _probe(url: str, timeout: float = 8.0, nbytes: int = 262144) -> float:
+    """抓 256KB 给镜像测速，返回「传完整个包预计耗时」；失败返回 inf。"""
+    t0 = time.time()
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Range": f"bytes=0-{nbytes - 1}"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            got = len(r.read(nbytes))
+        dt = max(time.time() - t0, 0.05)
+        if not got:
+            return float("inf")
+        size = int(PROGRESS.get("total") or 0) or 2400 * 1024
+        return size / (got / dt)  # 预计秒数
+    except Exception:  # noqa: BLE001 - 探测失败即淘汰
+        return float("inf")
+
+
 def _download(url: str, dest: Path, expect: int = 0) -> Path:
     part = dest.with_suffix(dest.suffix + ".part")
+    cands = asset_mirrors(url)
+    with _LOCK:
+        PROGRESS.update(phase="download", message="选择下载线路")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(cands)) as ex:
+        times = list(ex.map(_probe, cands))
+    scored = sorted(zip(times, cands))
+    with _LOCK:
+        PROGRESS["lines"] = [f"{u.split('/')[2]} {p:.1f}s" if p != float("inf") else f"{u.split('/')[2]} ✗"
+                             for p, u in scored]
     errs = []
-    for u in asset_mirrors(url):
+    for _, u in scored:
+        if _ == float("inf"):
+            continue
         try:
             _pull(u, part)
             got = part.stat().st_size if part.exists() else 0
             if got and (not expect or got == expect):
                 os.replace(part, dest)
+                with _LOCK:
+                    PROGRESS["line"] = u.split("/")[2]
                 return dest
             errs.append(f"{u.split('/')[2]}: {got}B")
-        except Exception as e:  # noqa: BLE001 - 逐个代理降级
+        except Exception as e:  # noqa: BLE001 - 逐线路降级
             errs.append(f"{u.split('/')[2]}: {type(e).__name__}")
             continue
-    raise RuntimeError("下载失败：" + " / ".join(errs[-4:]))
+    raise RuntimeError("下载失败：" + (" / ".join(errs[-3:]) or "所有线路不可达"))
 
 
 # ---------- 解包 / 换包 ----------

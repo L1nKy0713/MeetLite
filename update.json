@@ -4,8 +4,8 @@
   "notes": "首个版本：本地转写 + AI 纪要、中英双语、模型管理、自动更新。",
   "macos": {
     "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.0/MeetLite-1.0.zip",
-    "size": 2252241,
-    "sha256": "93327be65fe31b3b735694694b7652509852f3ab7f9df1e8aa1fa3c133f5d6ee"
+    "size": 2253809,
+    "sha256": "180a8172bff33d8be80da1af7b1334684027a53be4be7776cd0614105d64c6c2"
   },
   "windows": {
     "url": "",
