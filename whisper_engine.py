@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import threading
@@ -11,6 +12,8 @@ import time
 import uuid
 import wave
 from http.client import HTTPConnection
+
+import platforms
 
 SAMPLE_RATE = 16000
 
@@ -38,7 +41,12 @@ class WhisperEngine:
     # ---------- lifecycle ----------
     def _binary(self) -> str | None:
         b = self.cfg.get("whisper_server") or "whisper-server"
-        return shutil.which(b) if not os.path.isabs(b) else (b if os.path.isfile(b) else None)
+        if os.path.isabs(b):
+            return b if os.path.isfile(b) else None
+        local = Path(__file__).resolve().parent / "bin" / platforms.exe_name(b)
+        if local.is_file():
+            return str(local)
+        return shutil.which(b) or shutil.which(platforms.exe_name(b))
 
     def _alive(self) -> bool:
         try:

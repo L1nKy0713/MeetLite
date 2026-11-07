@@ -396,6 +396,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({
                 "ok": True,
                 "version": config_mod.APP_VERSION,
+                "models_ready": bool(cfg.get("whisper_model") and cfg.get("summary_model")),
                 "models": {
                     "whisper": os.path.basename(cfg.get("whisper_model") or ""),
                     "summary": os.path.basename(cfg.get("summary_model") or ""),

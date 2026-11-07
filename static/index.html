@@ -100,6 +100,9 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 .mitem .tag.on{color:#fff;background:var(--accent);border-color:var(--accent)}
 .mprog{display:flex;flex-direction:column;gap:6px}
 .mprog[hidden]{display:none}
+.first-acts{display:flex;gap:10px;margin:16px 0 4px}
+.first-acts button{padding:9px 16px;border-radius:9px;font-size:13px;cursor:pointer;font-weight:560}
+#firstMask .desc{line-height:1.75;font-size:13px}
 .settings-btn.has-upd::after{content:'';position:absolute;top:6px;right:8px;width:7px;height:7px;border-radius:50%;background:#e5484d}
 .settings-btn{position:relative}
 .upd-box{display:flex;align-items:center;justify-content:space-between;gap:14px;
@@ -273,6 +276,11 @@ const I18N = {
     language_desc: '界面语言，只影响按钮与提示文字。',
     asr_lang_desc: '语音识别使用的语言。选「自动识别」会自己判断，会议里混说中英文时最稳。',
     models: '模型', models_desc: '转写与纪要使用的本地模型文件。', model_manage: '管理模型',
+    first_title: '先准备两个本地模型',
+    first_body: 'MeetLite 全部在本机跑，不上传任何音频。开始前需要两个模型文件：转写用的 Whisper 和写纪要用的 GGUF。可以直接下载，也可以用本机已有的文件。',
+    first_download: '下载推荐模型',
+    first_later: '稍后再说',
+    first_hint: '推荐组合：ggml-large-v3-turbo-q5_0（574 MB）+ Qwen3.5-2B-Q4_K_M（1.2 GB），首次下载后一直复用。',
     about: '更新', check_update: '检查更新', checking: '检查中…',
     upd_latest: '已是最新版本（{v}）', upd_found: '发现新版本 {v}', upd_failed: '更新失败',
     upd_manual_hint: '当前是开发模式，请手动替换。', upd_downloading: '正在下载更新…',
@@ -315,6 +323,11 @@ const I18N = {
     language_desc: 'UI language; affects buttons and hints only.',
     asr_lang_desc: 'Language used for speech recognition. Auto detects, best for mixed Chinese/English meetings.',
     models: 'Models', models_desc: 'Local model files used for transcription and minutes.', model_manage: 'Manage',
+    first_title: 'Set up two local models first',
+    first_body: 'MeetLite runs entirely on this machine and uploads no audio. It needs two model files: Whisper for transcription and a GGUF for the minutes. Download them here or point at files you already have.',
+    first_download: 'Download recommended models',
+    first_later: 'Later',
+    first_hint: 'Recommended: ggml-large-v3-turbo-q5_0 (574 MB) + Qwen3.5-2B-Q4_K_M (1.2 GB), downloaded once and reused.',
     about: 'Updates', check_update: 'Check for updates', checking: 'Checking…',
     upd_latest: "You're on the latest version ({v})", upd_found: 'Version {v} is available', upd_failed: 'Update failed',
     upd_manual_hint: 'Running in dev mode — replace manually.', upd_downloading: 'Downloading update…',
@@ -376,6 +389,9 @@ function fmtSize(n){
   while(v >= 1024 && i < u.length - 1){ v /= 1024; i++; }
   return v.toFixed(v >= 10 || i === 0 ? 0 : 1) + ' ' + u[i];
 }
+function openFirst(){ $('#firstMask').hidden = false; }
+function closeFirst(){ $('#firstMask').hidden = true; }
+
 function openModels(){
   $('#modelsMask').hidden = false;
   document.body.style.overflow = 'hidden';
@@ -760,6 +776,7 @@ async function boot(){
     const m = location.hash.match(/^#m=([\w-]+)$/);
     if(m && m[1] !== S.meetingId){ try{ await openMeeting(m[1]); }catch(e){} }
     setStatus(sys.last_error ? sys.last_error : '', !!sys.last_error);
+    if(sys.models_ready === false) openFirst();
     watchWarm(sys.warm);
     if(sys.system_audio === false) showPerm(); else if(sys.system_audio === true) hidePerm();
     let tries = 0;
@@ -1029,6 +1046,23 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
           <button class="btn-ghost" onclick="openModels()" data-i18n="model_manage">管理模型</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="firstMask" hidden onclick="if(event.target===this)closeFirst()">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <h3 data-i18n="first_title">先准备两个本地模型</h3>
+      <button class="x" onclick="closeFirst()" aria-label="关闭">✕</button>
+    </div>
+    <div class="sheet-b">
+      <div class="desc" data-i18n="first_body">MeetLite 全部在本机跑，不上传任何音频。开始前需要两个模型文件：转写用的 Whisper 和写纪要用的 GGUF。可以直接下载，也可以用本机已有的文件。</div>
+      <div class="first-acts">
+        <button class="primary" onclick="closeFirst();openModels()" data-i18n="first_download">下载推荐模型</button>
+        <button class="btn-ghost" onclick="closeFirst()" data-i18n="first_later">稍后再说</button>
+      </div>
+      <div class="desc" data-i18n="first_hint">推荐组合：ggml-large-v3-turbo-q5_0（574 MB）+ Qwen3.5-2B-Q4_K_M（1.2 GB），首次下载后一直复用。</div>
     </div>
   </div>
 </div>
