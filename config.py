@@ -43,7 +43,7 @@ DEFAULTS = {
         "以下是普通话会议录音，涉及产品评审、灰度发布、语音转写、VAD、"
         "说话人分离、站会、纪要、预算、导出格式等术语。"
     ),
-    "update_url": "https://raw.githubusercontent.com/MeetLite/MeetLite/main/update.json",
+    "update_url": "https://raw.githubusercontent.com/L1nKy0713/MeetLite/main/update.json",
     "update_check": True,
     "asr_prompt_en": (
         "This is a meeting recording about product reviews, canary releases, "
