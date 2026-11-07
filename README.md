@@ -76,15 +76,19 @@ open /Users/yyl1nky/Documents/Projects/MeetLite/dist/MeetLite.app
 客户端能自己拉更新包，不依赖应用商店，也不用重装。左下「⚙ 设置 → 更新」里点「检查更新」；
 启动后也会在后台静默查一次，有新版时设置按钮右上角亮一个红点。
 
-- **检查**：`GET /api/update/check` 读一个 JSON 清单（默认 GitHub raw，可在 `config.json` 的 `update_url` 改）；
-  只比对版本号，不发任何机器信息。
-- **下载**：`POST /api/update/download` 按当前平台取清单里的 `macos` / `windows` 条目，
-  `Range` 断点续传，下完比对 `sha256`，对不上就删包报错。
+- **检查**：`GET /api/update/check` 读一个 JSON 清单（默认 `https://fastly.jsdelivr.net/gh/L1nKy0713/MeetLite@main/update.json`，
+  可在 `config.json` 的 `update_url` 改）。清单会**并行**从 jsDelivr 四个 CDN、GitHub raw 和
+  Releases API 同时取，取版本号最高的那份（同版本时以 raw/API 为准），所以 CDN 缓存旧清单也不会漏更新；
+  实测国内网络 2–7 秒返回。只比对版本号，不发任何机器信息。
+- **下载**：`POST /api/update/download` 按当前平台取清单里的 `macos` / `windows` 条目。GitHub Release
+  资产在国内常直连超时，所以会先并行探测四个反代（ghfast.top / gh-proxy.com / ghproxy.net /
+  hk.gh-proxy.com）与直连，按实测速度择优下载（256 KB 试抓估算整包耗时），全程 `Range` 断点续传，
+  下完比对 `sha256`，对不上就删包、换线路重试。实测 2.2 MB 包 5.8–19 秒下完。
 - **安装**：`POST /api/update/apply` 把新包换进原位。运行中的 `.app` 不能就地覆盖，
   所以落地一个 `apply.sh`：等服务进程与窗口壳都退出 → `mv` 旧包成 `.old` → `mv` 新包到位 →
   `xattr -dr com.apple.quarantine` → `open` 新版本 → 删 `.old`。任一步失败自动回滚。
   下次启动 `updater.cleanup()` 会清掉残留的 `.old`、脚本和解包目录。
-- **不做增量 diff**：整包才 1–2 MB，模型不进包，补丁方案不值当。
+- **不做增量 diff**：整包才 2 MB 左右，模型不进包，补丁方案不值当。
 - **不做静默安装**：换包必须重启，正在录音被打断是硬伤，所以最后一步永远由用户点。
 
 ### 发版流程（三分钟）
