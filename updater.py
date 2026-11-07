@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed
+from concurrent.futures import wait as fwait
 import os
 import shutil
 import subprocess
@@ -125,36 +126,77 @@ def mirrors(url: str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+def _repo_from_url(url: str) -> str | None:
+    """从清单地址反推 owner/repo（支持 raw、jsDelivr 两种写法）。"""
+    m = re.match(r"^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/", url) or \
+        re.match(r"^https://[a-z0-9.]*jsdelivr\.net/gh/([^/]+)/([^/@]+)@", url)
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def _manifest_from_release(rel: dict) -> dict:
+    """把 GitHub Releases API 的响应折叠成清单结构（sha256 取自资产的 digest）。"""
+    tag = str(rel.get("tag_name") or "").lstrip("v")
+    out = {"version": tag, "notes": rel.get("body") or "",
+           "published": str(rel.get("published_at") or "")[:10]}
+    for a in rel.get("assets") or []:
+        name = str(a.get("name") or "").lower()
+        key = "windows" if ("win" in name or name.endswith(".exe")) else "macos"
+        dg = str(a.get("digest") or "")
+        out[key] = {"url": a.get("browser_download_url") or "",
+                    "size": int(a.get("size") or 0),
+                    "sha256": dg.split(":", 1)[1] if dg.startswith("sha256:") else ""}
+    return out
+
+
 def _get_manifest(url: str, timeout: float = 10.0) -> dict:
-    """并行拉取所有镜像，返回版本号最高的清单（避免 CDN 旧缓存遮蔽新版）。"""
-    cands = mirrors(url)
+    """并行拉取清单与 Releases API，取版本号最高的那份。
+
+    - 版本相同时以 GitHub raw / Releases API（权威源）为准，避免 CDN 旧缓存给出错误 sha。
+    - API 一旦返回（通常 <1s）只再等 1s 就把结果交出去，其余镜像慢也不拖住用户。
+    """
+    cands = [("manifest", u) for u in mirrors(url)]
+    repo = _repo_from_url(url)
+    if repo:
+        cands.append(("api", f"https://api.github.com/repos/{repo}/releases/latest"))
     best: dict | None = None
-    best_src = False
+    best_auth = False
     errs: list[str] = []
+    api_done = 0.0
     ex = ThreadPoolExecutor(max_workers=max(1, min(6, len(cands))))
     try:
-        futs = {ex.submit(_get_one, u, timeout): u for u in cands}
-        try:
-            for f in as_completed(futs, timeout=timeout + 4):
+        futs = {}
+        for kind, u in cands:
+            futs[ex.submit(_get_one, u, timeout)] = (kind, u)
+        pending = set(futs)
+        hard_deadline = time.time() + timeout + 4
+        while pending:
+            slice_s = 0.8 if api_done else 3.0
+            slice_s = max(0.1, min(slice_s, hard_deadline - time.time()))
+            done, pending = fwait(pending, timeout=slice_s, return_when=FIRST_COMPLETED)
+            for f in done:
+                kind, src_url = futs[f]
                 try:
-                    m = f.result()
+                    raw = f.result()
                 except Exception as e:  # noqa: BLE001 - 单源失败不影响其它
-                    errs.append(f"{futs[f].split('/')[2]}: {type(e).__name__}")
+                    errs.append(f"{src_url.split('/')[2]}: {type(e).__name__}")
                     continue
-                v = str(m.get("version") or "").strip()
+                man = _manifest_from_release(raw) if kind == "api" else raw
+                v = str(man.get("version") or "").strip()
                 if not v:
                     continue
-                src_url = futs[f]
-                authoritative = "raw.githubusercontent.com" in src_url
+                auth = kind == "api" or "raw.githubusercontent.com" in src_url
                 if best is None:
-                    best, best_src = m, authoritative
-                    continue
-                bv = _tuple(str(best.get("version") or "0"))
-                if _tuple(v) > bv or (_tuple(v) == bv and authoritative and not best_src):
-                    # 版本相同时以 GitHub raw（权威源）为准，避免 CDN 旧缓存带来错误的 sha
-                    best, best_src = m, authoritative
-        except TimeoutError:
-            errs.append("并行拉取超时")
+                    best, best_auth = man, auth
+                else:
+                    bv = _tuple(str(best.get("version") or "0"))
+                    if _tuple(v) > bv or (_tuple(v) == bv and auth and not best_auth):
+                        best, best_auth = man, auth
+                if kind == "api":
+                    api_done = time.time()
+            if api_done and time.time() - api_done > 0.8:
+                break
+            if time.time() >= hard_deadline:
+                break
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
     if best is not None:
