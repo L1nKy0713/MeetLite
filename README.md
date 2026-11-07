@@ -154,6 +154,14 @@ cd /Users/yyl1nky/Documents/Projects/MeetLite
 
 ## 与 Meetily 的对应关系
 
+MeetLite 是独立实现：代码从零写起（Python 标准库 HTTP + 单页 HTML + Swift 外壳 + C++ 采集器），
+没有复制 Meetily 的 Rust / Next.js 源码、资源或图标。所谓「逆向」只是读它已发布的二进制与本地数据
+（SQLite 表结构、`preferences.json`、模型目录布局）来对齐行为，属于互操作性观察，不涉及规避任何技术保护措施。
+产品思路（按会议场景分模板做纪要、双路采集、常驻引擎）是公开可见的功能，实现方式与代码均为自写。
+Meetily 本身以 MIT 发布（Copyright (c) 2024 Zackriya Solutions）；若日后引用了它的任何代码或提示词文本，
+会在 `THIRD_PARTY.md` 里标注来源并保留其许可声明。项目名称、图标与 Meetily 无关联，也不代表其背书。
+
+
 | Meetily 能力 | MeetLite 实现 |
 | --- | --- |
 | 麦克风 + 系统声双路采集 | ffmpeg + ScreenCaptureKit，50ms 帧混音，VAD 自适应切段 |

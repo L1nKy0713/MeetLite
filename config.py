@@ -8,7 +8,7 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 DATA_DIR = platforms.data_dir()
 MEETILY_DATA = (platforms.meetily_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()
@@ -24,7 +24,6 @@ DEFAULTS = {
     "language": "zh",         # 旧字段，保留兼容
     "whisper_model": None,
     "summary_model": None,
-    "llama_helper": None,
     "llama_server": None,
     "llm_port": 8402,
     "llm_context": 8192,
@@ -99,17 +98,6 @@ def _find_summary_model() -> str | None:
     return None
 
 
-def _find_helper() -> str | None:
-    # macOS 上才有的 meetily 辅助进程；Windows 走 llama-server
-    if platforms.IS_MAC:
-        for p in (
-            Path("/Users/yyl1nky/WorkBuddy/2026-10-28-21-05-31/meetily/meetily.app/Contents/MacOS/llama-helper"),
-            Path("/Applications/meetily.app/Contents/MacOS/llama-helper"),
-        ):
-            if p.is_file() and os.access(p, os.X_OK):
-                return str(p)
-    return shutil.which("llama-helper")
-
 
 def _find_llama_server() -> str | None:
     local = platforms.find_bin("llama-server")
@@ -138,8 +126,6 @@ class Config:
             self.data["whisper_model"] = _find_whisper_model()
         if not self.data["summary_model"] or not Path(self.data["summary_model"]).is_file():
             self.data["summary_model"] = _find_summary_model()
-        if not self.data["llama_helper"] or not Path(self.data["llama_helper"]).is_file():
-            self.data["llama_helper"] = _find_helper()
         if not self.data.get("llama_server") or not Path(self.data["llama_server"]).is_file():
             self.data["llama_server"] = _find_llama_server()
         # 迁移：早期版本里写死的占位仓库地址（MeetLite/MeetLite 并不存在）

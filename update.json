@@ -1,15 +1,15 @@
 {
-  "version": "1.0.3",
-  "published": "2026-11-07",
-  "notes": "1.0.3：Windows 外壳改用系统自带的 .NET Framework 4.8（Win10/11 双击即用，无需装运行时）；缺 WebView2 时自动降级为系统浏览器；whisper 与 llama 分目录，避免 ggml 同名 dll 互相覆盖；导入音频内置纯标准库解码回退；报错文案跨平台化。",
+  "version": "1.0.4",
+  "published": "2026-11-08",
+  "notes": "1.0.4：移除对第三方 llama-helper 的探测，摘要全走 llama-server；/api/system 不再暴露本机路径；README 增加独立实现声明。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.3/MeetLite-1.0.3.zip",
-    "size": 1090854,
-    "sha256": "7ed8e827b067ac128596b884ed006ff749036804c84a29e58cc66a0872aef2f2"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.4/MeetLite-1.0.4.zip",
+    "size": 1090634,
+    "sha256": "ddf4eb68a95863aaccd4a5670aef27ee69c586e21bcf6b1f8ba78160160cc708"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.3/MeetLite-1.0.3-win.zip",
-    "size": 22981958,
-    "sha256": "e3cdb994e31ee32bff7933a1d61e12fcb5f3ca28cb90124674fc2887687f14ce"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.4/MeetLite-1.0.4-win.zip",
+    "size": 22983227,
+    "sha256": "b62440091768e23f6e13d586a3a04f0b7e522cbda5397d1dbae4cd6790f1ce93"
   }
 }

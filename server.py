@@ -393,7 +393,6 @@ class Handler(BaseHTTPRequestHandler):
                 "models": {
                     "whisper": os.path.basename(cfg.get("whisper_model") or ""),
                     "summary": os.path.basename(cfg.get("summary_model") or ""),
-                    "helper": cfg.get("llama_helper"),
                     "engine": cfg.get("llama_server"),
                 },
                 "devices": app.devices(),
