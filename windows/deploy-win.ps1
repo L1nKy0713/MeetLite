@@ -251,7 +251,16 @@ if ($isRemote) {
         exit 1
     }
 } else {
-    $zipPath = (Resolve-Path -LiteralPath $Url).Path
+    $resolved = Resolve-Path -LiteralPath $Url -ErrorAction SilentlyContinue
+    if (-not $resolved) {
+        Write-Err "找不到安装包：$Url"
+        exit 1
+    }
+    $zipPath = $resolved.Path
+    if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) {
+        Write-Err "-Url 需要指向一个 .zip 文件，不是目录：$zipPath"
+        exit 1
+    }
     Write-Ok "使用本地安装包 $zipPath"
 }
 
