@@ -4,8 +4,8 @@
   "notes": "1.0.1：自更新线路优化（jsDelivr + GitHub 代理测速择优），更新地址迁移修正。",
   "macos": {
     "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.1/MeetLite-1.0.1.zip",
-    "size": 2254030,
-    "sha256": "77a6392904226edd1c123800b125ec9e38af149856043ca0632e81aba1231ca6"
+    "size": 2254414,
+    "sha256": "4eeb1b39a153c90ca5e70acd58a940d35e77a3e1a911509c93533ae21ba64d9e"
   },
   "windows": {
     "url": "",

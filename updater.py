@@ -129,6 +129,7 @@ def _get_manifest(url: str, timeout: float = 10.0) -> dict:
     """并行拉取所有镜像，返回版本号最高的清单（避免 CDN 旧缓存遮蔽新版）。"""
     cands = mirrors(url)
     best: dict | None = None
+    best_src = False
     errs: list[str] = []
     ex = ThreadPoolExecutor(max_workers=max(1, min(6, len(cands))))
     try:
@@ -143,8 +144,15 @@ def _get_manifest(url: str, timeout: float = 10.0) -> dict:
                 v = str(m.get("version") or "").strip()
                 if not v:
                     continue
-                if best is None or _tuple(v) > _tuple(str(best.get("version") or "0")):
-                    best = m
+                src_url = futs[f]
+                authoritative = "raw.githubusercontent.com" in src_url
+                if best is None:
+                    best, best_src = m, authoritative
+                    continue
+                bv = _tuple(str(best.get("version") or "0"))
+                if _tuple(v) > bv or (_tuple(v) == bv and authoritative and not best_src):
+                    # 版本相同时以 GitHub raw（权威源）为准，避免 CDN 旧缓存带来错误的 sha
+                    best, best_src = m, authoritative
         except TimeoutError:
             errs.append("并行拉取超时")
     finally:
@@ -402,8 +410,22 @@ def download_and_stage(version_hint: str = "", url: str | None = None) -> dict:
             PROGRESS.update(phase="verify", message=remote)
         got = _sha256(zip_path)
         if want_sha and got != want_sha:
+            # 常见原因：CDN 缓存了旧清单，给的 size/sha 与最新包不符。
+            # 用带时间戳的权威地址重取一次清单再试。
             zip_path.unlink(missing_ok=True)
-            return _fail("更新包校验失败（sha256 不匹配），已删除")
+            try:
+                fresh = _get_manifest(src + ("&" if "?" in src else "?") + f"t={int(time.time())}")
+                a2 = fresh.get(platform_key()) or {}
+                link2 = (a2.get("url") or "").strip() or link
+                want_sha = (a2.get("sha256") or "").strip().lower() or want_sha
+                if link2 != link or a2.get("sha256"):
+                    _download(link2, zip_path, expect=int(a2.get("size") or 0))
+                    got = _sha256(zip_path)
+            except Exception:  # noqa: BLE001 - 重取失败就走下面的报错
+                pass
+            if want_sha and got != want_sha:
+                zip_path.unlink(missing_ok=True)
+                return _fail("更新包校验失败（sha256 不匹配），已删除")
         with _LOCK:
             PROGRESS.update(phase="unpack", message=remote)
         work = Path(tempfile.mkdtemp(prefix="update_", dir=str(UPDATE_DIR)))
