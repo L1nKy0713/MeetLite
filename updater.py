@@ -26,6 +26,8 @@ import sys
 import tempfile
 import threading
 import urllib.error
+import re
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -97,11 +99,44 @@ def can_self_update() -> bool:
 
 # ---------- 检查 ----------
 
-def _get_json(url: str, timeout: float = 8.0) -> dict:
+def _get_one(url: str, timeout: float = 8.0) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Cache-Control": "no-cache"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read(2 * 1024 * 1024)
     return json.loads(raw.decode("utf-8"))
+
+
+def mirrors(url: str) -> list[str]:
+    """同一份清单的多个可达地址。国内直连 GitHub raw 常被拖到超时，
+    因此默认用 jsDelivr CDN，并自动派生其它 CDN / raw 变体做降级。"""
+    out = [url]
+    gh = re.match(r"^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$", url)
+    jsd = re.match(r"^https://[a-z0-9.]*jsdelivr\.net/gh/([^/]+)/([^/@]+)@([^/]+)/(.+)$", url)
+    if gh:
+        user, repo, branch, path = gh.groups()
+        hosts = ["https://fastly.jsdelivr.net", "https://cdn.jsdelivr.net",
+                 "https://gcore.jsdelivr.net", "https://testingcf.jsdelivr.net"]
+        out += [f"{h}/gh/{user}/{repo}@{branch}/{path}" for h in hosts]
+    elif jsd:
+        user, repo, branch, path = jsd.groups()
+        hosts = ["https://fastly.jsdelivr.net", "https://cdn.jsdelivr.net",
+                 "https://gcore.jsdelivr.net", "https://testingcf.jsdelivr.net"]
+        out += [f"{h}/gh/{user}/{repo}@{branch}/{path}" for h in hosts]
+        out += [f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"]
+    return list(dict.fromkeys(out))
+
+
+def _get_json(url: str, timeout: float = 8.0) -> dict:
+    errs = []
+    for u in mirrors(url):
+        for attempt in (1, 2):
+            try:
+                return _get_one(u, timeout=timeout)
+            except Exception as e:  # noqa: BLE001 - 逐个镜像降级
+                errs.append(f"{u.split('/')[2]}: {type(e).__name__}")
+                if attempt == 1:
+                    time.sleep(0.6)
+    raise RuntimeError(" / ".join(errs[-4:]))
 
 
 def check(url: str | None = None) -> dict:
@@ -153,8 +188,24 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _download(url: str, dest: Path) -> Path:
-    part = dest.with_suffix(dest.suffix + ".part")
+RELEASE_PROXIES = [
+    "https://ghfast.top/",
+    "https://gh-proxy.com/",
+    "https://ghproxy.net/",
+    "https://hk.gh-proxy.com/",
+]
+
+
+def asset_mirrors(url: str) -> list[str]:
+    """GitHub Release 资产在国内经常直连超时，派生一组加速代理做降级。"""
+    out = [url]
+    m = re.match(r"^https://github\.com/([^/]+/[^/]+/releases/download/.+)$", url)
+    if m:
+        out += [p + "https://github.com/" + m.group(1) for p in RELEASE_PROXIES]
+    return list(dict.fromkeys(out))
+
+
+def _pull(url: str, part: Path) -> None:
     have = part.stat().st_size if part.exists() else 0
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     if have:
@@ -162,9 +213,8 @@ def _download(url: str, dest: Path) -> Path:
     try:
         resp = urllib.request.urlopen(req, timeout=20)
     except urllib.error.HTTPError as e:
-        if e.code == 416:  # 已经完整
-            os.replace(part, dest)
-            return dest
+        if e.code == 416:
+            return
         raise
     total = int(resp.headers.get("Content-Length") or 0) + (have if resp.status == 206 else 0)
     mode = "ab" if (have and resp.status == 206) else "wb"
@@ -181,8 +231,23 @@ def _download(url: str, dest: Path) -> Path:
             have += len(chunk)
             with _LOCK:
                 PROGRESS["done"] = have
-    os.replace(part, dest)
-    return dest
+
+
+def _download(url: str, dest: Path, expect: int = 0) -> Path:
+    part = dest.with_suffix(dest.suffix + ".part")
+    errs = []
+    for u in asset_mirrors(url):
+        try:
+            _pull(u, part)
+            got = part.stat().st_size if part.exists() else 0
+            if got and (not expect or got == expect):
+                os.replace(part, dest)
+                return dest
+            errs.append(f"{u.split('/')[2]}: {got}B")
+        except Exception as e:  # noqa: BLE001 - 逐个代理降级
+            errs.append(f"{u.split('/')[2]}: {type(e).__name__}")
+            continue
+    raise RuntimeError("下载失败：" + " / ".join(errs[-4:]))
 
 
 # ---------- 解包 / 换包 ----------
@@ -288,7 +353,7 @@ def download_and_stage(version_hint: str = "", url: str | None = None) -> dict:
         with _LOCK:
             PROGRESS.update(running=True, phase="download", done=0, total=int(asset.get("size") or 0),
                             error="", message=remote, version=remote)
-        _download(link, zip_path)
+        _download(link, zip_path, expect=int(asset.get("size") or 0))
         with _LOCK:
             PROGRESS.update(phase="verify", message=remote)
         got = _sha256(zip_path)

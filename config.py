@@ -43,7 +43,7 @@ DEFAULTS = {
         "以下是普通话会议录音，涉及产品评审、灰度发布、语音转写、VAD、"
         "说话人分离、站会、纪要、预算、导出格式等术语。"
     ),
-    "update_url": "https://raw.githubusercontent.com/L1nKy0713/MeetLite/main/update.json",
+    "update_url": "https://fastly.jsdelivr.net/gh/L1nKy0713/MeetLite@main/update.json",
     "update_check": True,
     "asr_prompt_en": (
         "This is a meeting recording about product reviews, canary releases, "
@@ -142,6 +142,10 @@ class Config:
             self.data["llama_helper"] = _find_helper()
         if not self.data.get("llama_server") or not Path(self.data["llama_server"]).is_file():
             self.data["llama_server"] = _find_llama_server()
+        # 迁移：早期版本里写死的占位仓库地址（MeetLite/MeetLite 并不存在）
+        url = str(self.data.get("update_url") or "")
+        if "MeetLite/MeetLite/" in url:
+            self.data["update_url"] = DEFAULTS["update_url"]
 
     def __getitem__(self, k):
         return self.data[k]
