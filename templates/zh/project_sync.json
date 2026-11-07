@@ -1,0 +1,27 @@
+{
+  "name": "项目同步会",
+  "description": "里程碑、进度、风险与资源",
+  "sections": [
+    {
+      "title": "进度概览",
+      "instruction": "对照里程碑说明当前完成度"
+    },
+    {
+      "title": "本周进展",
+      "instruction": "按模块分条，含数量化结果"
+    },
+    {
+      "title": "风险与依赖",
+      "instruction": "风险描述 + 影响 + 应对措施"
+    },
+    {
+      "title": "下一步计划",
+      "instruction": "表格：事项 | 负责人 | 时间"
+    },
+    {
+      "title": "需要决策的问题",
+      "instruction": "列出需要拍板的问题及备选方案"
+    }
+  ],
+  "lang": "zh"
+}

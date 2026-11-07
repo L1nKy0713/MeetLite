@@ -1,0 +1,27 @@
+{
+  "name": "复盘会",
+  "description": "做得好 / 待改进 / 行动项",
+  "sections": [
+    {
+      "title": "背景与目标",
+      "instruction": "这次复盘针对什么周期或事件"
+    },
+    {
+      "title": "做得好的",
+      "instruction": "可复用的做法，说明为什么有效"
+    },
+    {
+      "title": "待改进的",
+      "instruction": "问题现象 + 根因推断"
+    },
+    {
+      "title": "改进行动",
+      "instruction": "表格：行动 | 负责人 | 验收标准 | 时间"
+    },
+    {
+      "title": "经验沉淀",
+      "instruction": "值得写进规范/文档的结论"
+    }
+  ],
+  "lang": "zh"
+}

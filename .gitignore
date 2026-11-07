@@ -1,0 +1,37 @@
+# 构建产物
+dist/
+build/
+*.app/
+*.dmg
+*.zip
+
+# 模型权重（体积大，首次启动下载或用户自备）
+models/
+*.gguf
+*.bin
+!bin/*.swift
+
+# 运行时数据
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+config.json
+recordings/
+*.wav
+*.raw
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 平台
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp

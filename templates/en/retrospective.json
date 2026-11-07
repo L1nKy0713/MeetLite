@@ -1,0 +1,27 @@
+{
+  "name": "Retrospective",
+  "description": "What went well / what to improve / action items",
+  "sections": [
+    {
+      "title": "Context and Goals",
+      "instruction": "Which period or incident this retrospective covers"
+    },
+    {
+      "title": "What Went Well",
+      "instruction": "Practices worth repeating, and why they worked"
+    },
+    {
+      "title": "What to Improve",
+      "instruction": "Observed symptoms + inferred root cause"
+    },
+    {
+      "title": "Improvement Actions",
+      "instruction": "Table: Action | Owner | Acceptance criteria | When"
+    },
+    {
+      "title": "Lessons Worth Keeping",
+      "instruction": "Conclusions that belong in a spec or doc"
+    }
+  ],
+  "lang": "en"
+}

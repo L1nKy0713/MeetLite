@@ -1,0 +1,27 @@
+{
+  "name": "Project Sync",
+  "description": "Milestones, progress, risks and resourcing",
+  "sections": [
+    {
+      "title": "Progress Overview",
+      "instruction": "Completion against milestones as they stand now"
+    },
+    {
+      "title": "This Week's Work",
+      "instruction": "Grouped by module, with quantified results"
+    },
+    {
+      "title": "Risks and Dependencies",
+      "instruction": "Risk description + impact + mitigation"
+    },
+    {
+      "title": "Next Steps",
+      "instruction": "Table: Item | Owner | When"
+    },
+    {
+      "title": "Decisions Needed",
+      "instruction": "Questions that need a call, with the options on the table"
+    }
+  ],
+  "lang": "en"
+}

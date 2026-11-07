@@ -1,0 +1,27 @@
+{
+  "name": "Customer Call",
+  "description": "Customer needs, objections and next steps",
+  "sections": [
+    {
+      "title": "Customer Profile",
+      "instruction": "Company, roles on the call, what they are asking for"
+    },
+    {
+      "title": "Needs and Pain Points",
+      "instruction": "What the customer explicitly asked for, and the motivation behind it"
+    },
+    {
+      "title": "Objections and Concerns",
+      "instruction": "Pricing, competitors, rollout risk, and how we responded"
+    },
+    {
+      "title": "Commitments and Next Steps",
+      "instruction": "Table: Item | Us/Customer | When"
+    },
+    {
+      "title": "Follow-up Advice",
+      "instruction": "The three most effective next actions"
+    }
+  ],
+  "lang": "en"
+}

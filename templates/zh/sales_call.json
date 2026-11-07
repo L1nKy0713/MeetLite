@@ -1,0 +1,27 @@
+{
+  "name": "客户沟通 / 销售电话",
+  "description": "客户需求、异议、下一步",
+  "sections": [
+    {
+      "title": "客户概况",
+      "instruction": "客户名称、角色、当前诉求"
+    },
+    {
+      "title": "需求与痛点",
+      "instruction": "客户明确说出的需求与背后动机"
+    },
+    {
+      "title": "异议与顾虑",
+      "instruction": "价格、竞品、实施风险等顾虑及回应"
+    },
+    {
+      "title": "承诺与下一步",
+      "instruction": "表格：事项 | 我方/客户 | 时间"
+    },
+    {
+      "title": "跟进建议",
+      "instruction": "下一步最有效的三个动作"
+    }
+  ],
+  "lang": "zh"
+}

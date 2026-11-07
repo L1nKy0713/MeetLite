@@ -1,0 +1,23 @@
+{
+  "name": "每日站会",
+  "description": "短会，按人汇总进展与阻塞",
+  "sections": [
+    {
+      "title": "整体状态",
+      "instruction": "一句话概括今天整体进展"
+    },
+    {
+      "title": "各人进展",
+      "instruction": "每人 2-3 条：昨天完成 / 今天计划"
+    },
+    {
+      "title": "阻塞项",
+      "instruction": "谁被什么卡住，需要谁支持"
+    },
+    {
+      "title": "今日重点",
+      "instruction": "当天必须完成的三件事以内"
+    }
+  ],
+  "lang": "zh"
+}

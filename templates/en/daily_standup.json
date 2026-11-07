@@ -1,0 +1,23 @@
+{
+  "name": "Daily Standup",
+  "description": "Short sync, per-person progress and blockers",
+  "sections": [
+    {
+      "title": "Overall Status",
+      "instruction": "One sentence on where the team stands today"
+    },
+    {
+      "title": "Per-person Updates",
+      "instruction": "2-3 bullets per person: done yesterday / planned today"
+    },
+    {
+      "title": "Blockers",
+      "instruction": "Who is blocked by what, and who needs to unblock them"
+    },
+    {
+      "title": "Today's Focus",
+      "instruction": "At most three things that must be finished today"
+    }
+  ],
+  "lang": "en"
+}

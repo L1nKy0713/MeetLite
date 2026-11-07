@@ -1,0 +1,27 @@
+{
+  "name": "Standard Meeting Minutes",
+  "description": "General weekly / review meetings, with decisions and an action-item table",
+  "sections": [
+    {
+      "title": "Summary",
+      "instruction": "3-5 sentences covering the meeting purpose and the overall conclusion"
+    },
+    {
+      "title": "Discussion Points",
+      "instruction": "Group by topic, keep key numbers, disagreements and the reasoning behind trade-offs"
+    },
+    {
+      "title": "Key Decisions",
+      "instruction": "List decisions that were actually made, each with its rationale"
+    },
+    {
+      "title": "Action Items",
+      "instruction": "Markdown table: Owner | Task | Due | Timestamp in recording"
+    },
+    {
+      "title": "Risks and Open Questions",
+      "instruction": "Unresolved issues, dependencies, and anything needing escalation"
+    }
+  ],
+  "lang": "en"
+}

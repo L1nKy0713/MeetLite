@@ -1,0 +1,27 @@
+{
+  "name": "标准会议纪要",
+  "description": "通用周会/评审会，含决定与待办表格",
+  "sections": [
+    {
+      "title": "会议摘要",
+      "instruction": "3-5 句话说明会议目的与整体结论"
+    },
+    {
+      "title": "讨论要点",
+      "instruction": "按主题分条，保留关键数字、分歧与取舍理由"
+    },
+    {
+      "title": "关键决定",
+      "instruction": "列出已达成的决定，每条注明依据"
+    },
+    {
+      "title": "待办事项",
+      "instruction": "用 Markdown 表格：负责人 | 任务 | 截止时间 | 相关时间戳"
+    },
+    {
+      "title": "风险与待确认",
+      "instruction": "未解决的问题、依赖项、需要向上确认的事项"
+    }
+  ],
+  "lang": "zh"
+}
