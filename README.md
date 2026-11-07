@@ -195,11 +195,15 @@ python3 tools/bench.py --skip-summary        # 只测转写
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | M0 | 平台差异层 `platforms.py`（数据目录 / 设备枚举 / 采集器 / 进程控制） | ✅ 已落地 |
-| M1 | `bin/loopcap/loopcap.cpp`：WASAPI loopback + 麦克风，内部混音，输出 16k mono s16le | ✅ 已交叉编译出 `dist/loopcap.exe`（需在 Windows 上实测） |
+| M1 | `bin/loopcap/loopcap.cpp`：WASAPI loopback + 麦克风，内部混音，输出 16k mono s16le | ✅ `dist/loopcap.exe` 3.6 MB；PE 导入表仅 kernel32/ole32/UCRT，静态链接无额外 dll |
 | M2 | 采集层接入：`platforms.NATIVE_CAPTURE` + `Recorder.start()` 单进程路径 | ✅ 已落地 |
-| M3 | C# / .NET 8 + WebView2 原生外壳（`windows/MeetLite.Win/`） | ✅ 已交叉编译出 `MeetLite.exe`（1.0 MB，需在 Windows 上实测） |
-| M4 | `windows/build-win.ps1` 打包 + 首启动模型向导 | ✅ 脚本与向导已落地（脚本需在 Windows 上跑一次） |
-| M5 | 基准脚本 `tools/bench.py` | ✅ 已跑出 macOS 数据；Windows 数据待实机补 |
+| M3 | C# / .NET 8 + WebView2 原生外壳（`windows/MeetLite.Win/`） | ✅ `MeetLite.exe` 1.0 MB，已交叉编译；任务栏/托盘、Job 对象杀进程树、深色标题栏 |
+| M4 | `windows/build-win.ps1` 打包 + 首启动模型向导 | ✅ 已按脚本流程产出 `MeetLite-1.0.2-win.zip`（87 文件 / 23.7 MB） |
+| M5 | 基准脚本 `tools/bench.py` | ✅ 已跑出 macOS 数据（RTF 0.287）；Windows 数据待实机补 |
+
+采集层契约已在 macOS 上用等价 stub 实测：`--list` 解析出 capture 端点 → 拼 `--mode mix --in-device`
+→ Recorder 收到 16k mono s16le → 切段 → 直喂 whisper 出中文字幕，位序与采样率都正确。
+剩下的就是把整包丢进真机 Windows 跑一遍。
 
 `loopcap.exe` 命令行：
 
@@ -213,7 +217,31 @@ loopcap.exe --in-device "{0.0.1.00000000}.{...}"   # 指定麦克风端点
 
 构建（macOS 上交叉编译）：`brew install mingw-w64 && bash bin/loopcap/build.sh`。
 
-### 在 Windows 上打包
+### 在 Windows 上使用
+
+Releases 里直接下 `MeetLite-1.0.2-win.zip`（23.7 MB，解压即用，共 87 个文件）：
+
+```
+MeetLite.exe              1.0 MB  C# / .NET 8 + WebView2 外壳
+WebView2Loader.dll
+meetlite.ico
+使用说明.txt
+app\                        Python 后端（server/capture/config/llm/store/summarize/…）
+  bin\loopcap.exe          3.6 MB  WASAPI loopback + 麦克风采集（静态链接，无额外 dll 依赖）
+  bin\whisper-server.exe   whisper.cpp v1.8.2（x64 CPU）
+  bin\llama-server.exe     llama.cpp b6000（x64 CPU）
+  static\ templates\
+runtime\                    Python 3.11.9 embeddable（含 stdlib zip、ssl、vcruntime）
+```
+
+首次运行：双击 `MeetLite.exe` → 向导里下载两个模型（hf-mirror，断点续传 + sha256）→ 开始录音。
+系统声走 WASAPI loopback，不需要虚拟声卡、不需要管理员权限；麦克风与系统声在 `loopcap.exe`
+内部混成一路 16k mono s16le 再喂 whisper，所以界面上的三个声源档位在 Windows 上同样可用。
+
+已知限制：Windows 外壳与 `build-win.ps1` 目前只做到「能交叉编译、能打包、采集层契约在 macOS 上
+用等价 stub 实测通过」，还没在真机 Windows 上跑过一遍（本机没有 Windows 环境）。
+
+### 自己打包（Windows 上）
 
 需要 .NET 8 SDK（`winget install Microsoft.DotNet.SDK.8`），PowerShell 里执行：
 
@@ -227,10 +255,20 @@ cd windows
 1. `dotnet publish` 出 `MeetLite.exe`（自包含关闭，只需系统装 WebView2 运行时；Win10/11 自带）。
 2. 下载 Python 3.11 embed 包解到 `runtime\`，并把 `python311._pth` 里补一行 `.`。
 3. 拷 `app\`：`server.py`、采集/模型/更新等模块、`static\`、`templates\`。
-4. `app\bin\` 放 `loopcap.exe` + `whisper-server.exe` + `llama-server.exe` 与其 dll
-   （从 whisper.cpp / llama.cpp 的 GitHub Release 拉，走 `ghfast.top` 等镜像回退）。
+4. `app\bin\` 放 `loopcap.exe` + `whisper-server.exe` + `llama-server.exe` 与其 dll。
 5. 放图标与「使用说明.txt」。
 6. `Compress-Archive` 出 zip 并打印 size / sha256，填进 `update.json` 即可发版。
 
-离线打包：先手动把 `whisper-bin-x64.zip`、`llama-*-bin-win-cpu-x64.zip`、`python-3.11.9-embed-amd64.zip`
-放进 `%TEMP%\meetlite-cache\`，再 `build-win.ps1 -LocalCache`。
+上游二进制地址（脚本里已写死回退链，因为 latest 版本经常不带 Windows 预编译包）：
+
+| 组件 | tag | 资产 |
+| --- | --- | --- |
+| whisper.cpp | `v1.8.2`（latest v1.9.5 无资产） | `whisper-bin-x64.zip` 3.8 MB |
+| llama.cpp | `b6000`（latest v0.9.0 只有 nightly-tag.txt） | `llama-b6000-bin-win-cpu-x64.zip` 14.4 MB |
+| Python | 3.11.9 | `python-3.11.9-embed-amd64.zip` 11.2 MB |
+
+下载顺序是 `gh-proxy.com` → `ghfast.top` → 直连（实测 ghfast.top 对 release 资产回 403，
+github.com 直连在本机被重置）。
+
+离线打包：先手动把上面三个 zip 放进 `%TEMP%\meetlite-cache\`（文件名分别为
+`whisper-bin-x64.zip`、`llama-win-x64.zip`、`python-embed.zip`），再 `build-win.ps1 -LocalCache`。

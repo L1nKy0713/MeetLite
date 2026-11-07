@@ -70,8 +70,10 @@ Copy-Item $Loop "$Stage\app\bin\loopcap.exe" -Force
 
 function Get-GithubZip($pattern, $dest) {
     # 依次试 GitHub 直连与常见反代
-    $hosts = @('https://github.com/', 'https://ghfast.top/https://github.com/',
-               'https://gh-proxy.com/https://github.com/')
+    # 反代优先：直连在中国大陆经常被重置，ghfast.top 对 release 资产会回 403
+    $hosts = @('https://gh-proxy.com/https://github.com/',
+               'https://ghfast.top/https://github.com/',
+               'https://github.com/')
     foreach ($h in $hosts) {
         try {
             $url = $h + $pattern
@@ -84,16 +86,29 @@ function Get-GithubZip($pattern, $dest) {
 }
 
 function Get-LatestTag($repo) {
-    $j = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -TimeoutSec 60
-    return $j.tag_name
+    try {
+        $j = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -TimeoutSec 60
+        return $j.tag_name
+    } catch { return $null }
+}
+
+# 上游 latest 版本经常不带 Windows 预编译包（whisper.cpp v1.9.x、llama.cpp v0.9.x 都是空资产），
+# 所以 latest 失败时回退到已知带 x64 资产的固定 tag。
+function Get-TagCandidates($repo, $fallback) {
+    $list = @()
+    $t = Get-LatestTag $repo
+    if ($t) { $list += $t }
+    foreach ($f in $fallback) { if ($list -notcontains $f) { $list += $f } }
+    return $list
 }
 
 $WhisperZip = Join-Path $CacheDir 'whisper-bin-x64.zip'
 if (-not (Test-Path $WhisperZip)) {
-    $tag = Get-LatestTag 'ggml-org/whisper.cpp'
-    if (-not (Get-GithubZip "ggml-org/whisper.cpp/releases/download/$tag/whisper-bin-x64.zip" $WhisperZip)) {
-        throw "下载 whisper.cpp 二进制失败"
+    $ok = $false
+    foreach ($tag in (Get-TagCandidates 'ggml-org/whisper.cpp' @('v1.8.2'))) {
+        if (Get-GithubZip "ggml-org/whisper.cpp/releases/download/$tag/whisper-bin-x64.zip" $WhisperZip) { $ok = $true; break }
     }
+    if (-not $ok) { throw "下载 whisper.cpp 二进制失败（latest 与回退 tag v1.8.2 都没有 whisper-bin-x64.zip）" }
 }
 $tmp = Join-Path $Out '_whisper'
 Expand-Archive $WhisperZip -DestinationPath $tmp -Force
@@ -103,10 +118,11 @@ Remove-Item $tmp -Recurse -Force
 
 $LlamaZip = Join-Path $CacheDir 'llama-win-x64.zip'
 if (-not (Test-Path $LlamaZip)) {
-    $tag = Get-LatestTag 'ggml-org/llama.cpp'
-    if (-not (Get-GithubZip "ggml-org/llama.cpp/releases/download/$tag/llama-$tag-bin-win-cpu-x64.zip" $LlamaZip)) {
-        throw "下载 llama.cpp 二进制失败"
+    $ok = $false
+    foreach ($tag in (Get-TagCandidates 'ggml-org/llama.cpp' @('b6000'))) {
+        if (Get-GithubZip "ggml-org/llama.cpp/releases/download/$tag/llama-$tag-bin-win-cpu-x64.zip" $LlamaZip) { $ok = $true; break }
     }
+    if (-not $ok) { throw "下载 llama.cpp 二进制失败（latest 与回退 tag b6000 都没有 llama-<tag>-bin-win-cpu-x64.zip）" }
 }
 $tmp = Join-Path $Out '_llama'
 Expand-Archive $LlamaZip -DestinationPath $tmp -Force

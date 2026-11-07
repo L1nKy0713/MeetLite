@@ -8,8 +8,8 @@
     "sha256": "f6a329db698ab8e7735a2a7df6ee78077c3e7973d38df98b973981a787c49fd5"
   },
   "windows": {
-    "url": "",
-    "size": 0,
-    "sha256": ""
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.2/MeetLite-1.0.2-win.zip",
+    "size": 23704685,
+    "sha256": "4b80b5509b61a045785d7b74e92f45d5021f693757dfcd678240d4dd17b62a1b"
   }
 }
