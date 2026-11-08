@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, urlparse
 
 import audiodec
 import config as config_mod
+import feedback as feedback_mod
 import platforms
 import store as store_mod
 import model_manager
@@ -46,6 +47,7 @@ SENSITIVITY = {
 class App:
     def __init__(self, cfg):
         self.cfg = cfg
+        self._log_ring: list[str] = []
         self.store = store_mod.Store(config_mod.DATA_DIR / "meetlite.sqlite")
         self.whisper = WhisperEngine(cfg, self.log)
         self.llm = LocalLLM(cfg, self.log)
@@ -125,7 +127,14 @@ class App:
         return self._devices
 
     def log(self, msg):
-        print(msg, flush=True)
+        line = time.strftime("%H:%M:%S ") + str(msg)
+        self._log_ring.append(line)
+        if len(self._log_ring) > 200:
+            del self._log_ring[:len(self._log_ring) - 200]
+        print(line, flush=True)
+
+    def log_tail(self, n=30) -> list[str]:
+        return self._log_ring[-n:]
 
     # ---------------- 事件广播 ----------------
     def subscribe(self, mid: str) -> queue.Queue:
@@ -416,6 +425,23 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "lang": lang, "templates": summarize_mod.list_templates(lang)})
 
         # ---- 界面偏好（端口每次启动会变，localStorage 不可靠，存到 config.json）----
+        # ---- 问题反馈 ----
+        if p == "/api/feedback/diagnostics" and method == "GET":
+            diag = feedback_mod.diagnostics(app.cfg, app)
+            return self._json({"ok": True, "diagnostics": diag,
+                               "text": feedback_mod.diag_text(diag),
+                               "webhook": bool((app.cfg.get("feedback_webhook") or "").strip())})
+
+        if p == "/api/feedback" and method == "POST":
+            body = self._body()
+            if not isinstance(body, dict):
+                return self._json({"ok": False, "error": "bad body"}, 400)
+            res = feedback_mod.submit(app.cfg, app, body)
+            return self._json(res, 200 if res.get("ok") else 200)
+
+        if p == "/api/feedback" and method == "GET":
+            return self._json({"ok": True, "items": feedback_mod.local_list(20)})
+
         if p == "/api/prefs":
             if method == "GET":
                 return self._json({

@@ -117,6 +117,55 @@ stat -f%z MeetLite-1.0.1.zip                    # 得到字节数
 `version` 一改，所有在跑的老版本下次查清单就会看到更新。没有 `windows` 条目时 Windows 客户端会提示
 「清单里没有当前平台的下载地址」，不影响使用。
 
+## 问题反馈
+
+设置 → 问题反馈。三种走法，按可用性自动降级：
+
+| 通道 | 触发条件 | 用户要做什么 |
+| --- | --- | --- |
+| webhook | `config.json` 里 `feedback_webhook` 有值 | 点「发送」即可 |
+| 本地归档 | 永远执行 | 无（`数据目录/feedback/*.json`） |
+| GitHub 预填 | 没有 webhook，或上报失败 | 点状态栏里的「在 GitHub 打开」，用自己账号提交 |
+
+诊断信息只含版本、系统、Python 版本、界面/转写语言、两个模型的文件名与大小、最近 30 行日志；
+**不含**会议标题、转写文字、笔记、录音；路径里的用户名会被替换成 `***`。
+弹层里能直接看到将要发送的原文，也可以关掉「附带环境信息」或改用「复制内容」自己粘贴。
+
+### 收反馈（两种，任选）
+
+**A. 零后端（立刻能用）**：什么都不配，用户点「发送」后走 GitHub 预填；
+反馈以 issue 形式进仓库，label 是 `feedback`。
+
+**B. 加一个接收端（用户不用 GitHub 账号）**：`server/feedback-worker.js` 是 Cloudflare Worker，
+用服务端 token 建 issue。部署约 5 分钟：
+
+```bash
+npm i -g wrangler && wrangler login
+wrangler secret put GH_TOKEN         # GitHub PAT，只需 issues 写权限
+wrangler secret put FEEDBACK_TOKEN   # 自定义口令
+cd server && wrangler deploy
+```
+
+然后把 `https://<worker>.workers.dev/f?k=<FEEDBACK_TOKEN>` 填进每个客户端的
+`config.json → feedback_webhook`（或写进打包时的默认 `DEFAULTS`）。
+
+### 每周一 08:00 自动汇总
+
+`.github/workflows/feedback-digest.yml` 用 GitHub Actions 定时跑（UTC 周一 00:00 = 北京周一 08:00）：
+
+1. `gh api` 拉最近 7 天有更新的 `label=feedback` issue；
+2. `server/feedback-digest.mjs` 折成 Markdown（类型 / 标题 / 状态 / 链接 + 详情）；
+3. 写进 `feedback/digest/<日期>.md` 并提交，同时贴到该次 Actions 的 Summary 页。
+
+想改节奏就改 cron；想立刻拉一次用 `workflow_dispatch`（可传 `days`）。
+不需要 GitHub Actions 的话，本机 cron 一样能跑：
+
+```bash
+0 8 * * 1 cd ~/MeetLite && gh api -X GET repos/L1nKy0713/MeetLite/issues \
+  -f state=all -f labels=feedback -f per_page=100 > /tmp/i.json \
+  && node server/feedback-digest.mjs /tmp/i.json > feedback/digest/$(date +\%F).md
+```
+
 ## 依赖（已在本机装好）
 
 ```bash

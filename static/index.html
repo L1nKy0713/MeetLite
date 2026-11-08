@@ -115,6 +115,18 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 .mfrom{display:flex;gap:8px;align-items:center}
 .mfrom input[type=text]{flex:1;min-width:0;font:inherit;font-size:12.5px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--btn-bg);color:inherit}
 .mhint{font-size:11.5px;color:var(--dim);line-height:1.5}
+.fbf{display:flex;flex-direction:column;gap:12px}
+.fbf .flabel{display:block;font-size:12px;font-weight:600;color:var(--dim);margin-bottom:5px}
+.fbf input[type=text],.fbf textarea,.fbf select{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--btn-bg);color:inherit}
+.fbf textarea{resize:vertical;min-height:104px;line-height:1.55}
+.fbf .chk{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.5;cursor:pointer;color:inherit}
+.fbf .chk input{width:auto;margin-top:2px}
+.fb-diag{margin:8px 0 0;padding:8px 10px;max-height:140px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all;color:var(--dim)}
+.fb-foot{display:flex;align-items:center;gap:8px;margin-top:16px}
+.fb-status{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dim);word-break:break-word}
+.fb-status.ok{color:var(--green)}
+.fb-status.warn{color:var(--red)}
+.fb-status a{color:var(--accent)}
 #langCtl button{font-size:11.5px}
 .seg-ctl{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--btn-bg)}
 .seg-ctl button{flex:1;border:0;border-radius:0;background:transparent;padding:5px 0;font-size:12px;color:var(--dim)}
@@ -313,6 +325,19 @@ const I18N = {
     queued: '排队中…', note_saving: '…', note_saved: '已保存', note_failed: '保存失败',
     uploading: '上传 {name} …', importing: '导入中，转写会按段显示…', import_failed: '导入失败: ',
     elapsed: '用时 {s}s', err: '出错', draft: '整理中…',
+    fb: '问题反馈', fb_desc: '遇到问题或想提建议？直接写给我们，会带上必要的环境信息。',
+    fb_open: '反馈问题', fb_title: '问题反馈', fb_kind: '类型',
+    fb_kind_bug: '问题 / Bug', fb_kind_idea: '建议', fb_kind_other: '其他',
+    fb_subject: '标题', fb_subject_ph: '一句话说清问题，例如「导出的 Markdown 里时间戳重复」',
+    fb_detail: '详细描述', fb_detail_ph: '发生了什么、在哪一步、你期望的结果是什么。',
+    fb_contact: '联系方式（可选）', fb_contact_ph: '邮箱或微信，方便我们追问细节',
+    fb_diag: '附带环境信息', fb_diag_desc: '版本、系统、模型文件名与最近日志；不含会议标题、转写内容、笔记和录音。',
+    fb_send: '发送', fb_copy: '复制内容', fb_cancel: '取消',
+    fb_sending: '发送中…', fb_sent: '已收到，感谢反馈！',
+    fb_saved_only: '已存在本机，但没能发出去', fb_open_github: '在 GitHub 打开',
+    fb_need: '标题和描述都要填一下（描述至少 5 个字）', fb_copied: '已复制，可以粘贴到任意地方',
+    fb_privacy: '只包含上面这些环境信息，不含会议标题、转写文字、笔记或录音。',
+    fb_confirm_cancel: '内容还没发送，确定关闭？',
   },
   en: {
     new_meeting: '＋ New meeting', import: 'Import', import_title: 'Import an existing audio file',
@@ -360,6 +385,19 @@ const I18N = {
     queued: 'Queued…', note_saving: '…', note_saved: 'Saved', note_failed: 'Save failed',
     uploading: 'Uploading {name} …', importing: 'Importing — segments appear as they are transcribed…', import_failed: 'Import failed: ',
     elapsed: '{s}s', err: 'Error', draft: 'Drafting…',
+    fb: 'Feedback', fb_desc: 'Hit a problem or have an idea? Write to us — it includes the environment info we need.',
+    fb_open: 'Send feedback', fb_title: 'Feedback', fb_kind: 'Type',
+    fb_kind_bug: 'Problem / bug', fb_kind_idea: 'Idea', fb_kind_other: 'Other',
+    fb_subject: 'Title', fb_subject_ph: 'One line, e.g. “timestamps repeat in the exported Markdown”',
+    fb_detail: 'Details', fb_detail_ph: 'What happened, at which step, and what you expected.',
+    fb_contact: 'Contact (optional)', fb_contact_ph: 'Email or WeChat, in case we need to follow up',
+    fb_diag: 'Attach environment info', fb_diag_desc: 'Version, OS, model file names and recent log lines; no meeting titles, transcripts, notes or audio.',
+    fb_send: 'Send', fb_copy: 'Copy', fb_cancel: 'Cancel',
+    fb_sending: 'Sending…', fb_sent: 'Got it — thanks!',
+    fb_saved_only: 'Saved locally, but it did not go through', fb_open_github: 'Open on GitHub',
+    fb_need: 'Please fill in both the title and the details (at least 5 characters)', fb_copied: 'Copied',
+    fb_privacy: 'Only the environment details above — no meeting titles, transcripts, notes or audio.',
+    fb_confirm_cancel: 'Nothing was sent yet — close anyway?',
   }
 };
 let LANG = 'zh';
@@ -483,9 +521,91 @@ async function useModel(id){
   }catch(e){ alert(e.message || e); }
 }
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape' && !$('#modelsMask').hidden) closeModels();
+  if(e.key !== 'Escape') return;
+  if(!$('#fbMask').hidden) closeFeedback();
+  else if(!$('#modelsMask').hidden) closeModels();
 });
 
+
+// ---------- 问题反馈 ----------
+let FBDIAG = '';
+function setFbStatus(html, cls){
+  const el = $('#fbStatus');
+  el.className = 'fb-status' + (cls ? ' ' + cls : '');
+  el.innerHTML = html || '';
+}
+async function openFeedback(){
+  $('#fbMask').hidden = false;
+  document.body.style.overflow = 'hidden';
+  setFbStatus('');
+  loadDiag();
+}
+function closeFeedback(){
+  $('#fbMask').hidden = true;
+  document.body.style.overflow = '';
+}
+async function loadDiag(){
+  const box = $('#fbDiag');
+  box.textContent = '读取中…';
+  try{
+    const r = await fetch('/api/feedback/diagnostics');
+    const j = await r.json();
+    FBDIAG = j.text || '';
+    box.textContent = FBDIAG || '（无）';
+  }catch(e){
+    box.textContent = '读取失败：' + (e.message || e);
+  }
+}
+async function fbSend(){
+  const title = $('#fbTitle').value.trim();
+  const body  = $('#fbBody').value.trim();
+  if(!title || body.length < 5){ setFbStatus(t('fb_need'), 'warn'); return; }
+  const btn = $('#fbSendBtn');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t('fb_sending');
+  setFbStatus('');
+  let j = {};
+  try{
+    const r = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        kind: $('#fbKind').value,
+        title, body,
+        contact: $('#fbContact').value.trim(),
+        include_diag: $('#fbDiagOn').checked
+      })
+    });
+    j = await r.json();
+  }catch(e){
+    j = {ok: false, error: String(e.message || e)};
+  }
+  btn.disabled = false;
+  btn.textContent = label;
+  if(j.ok){
+    setFbStatus(t('fb_sent'), 'ok');
+    $('#fbTitle').value = '';
+    $('#fbBody').value = '';
+    $('#fbContact').value = '';
+    setTimeout(closeFeedback, 1200);
+    return;
+  }
+  let msg = t('fb_saved_only');
+  if(j.error) msg += ' · ' + j.error;
+  if(j.url) msg += ' · <a href="' + j.url + '" target="_blank" rel="noopener">' + t('fb_open_github') + '</a>';
+  setFbStatus(msg, 'warn');
+}
+function fbCopy(){
+  const parts = [$('#fbTitle').value.trim(), $('#fbBody').value.trim()];
+  if($('#fbDiagOn').checked && FBDIAG) parts.push('---\n' + FBDIAG);
+  const txt = parts.filter(Boolean).join('\n\n');
+  const done = () => setFbStatus(t('fb_copied'), 'ok');
+  const fail = () => setFbStatus('复制失败，请手动选择文本', 'warn');
+  if(navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(txt).then(done, fail);
+  else fail();
+}
 
 // ---------- 自更新 ----------
 const UPD = { state: null, staged: '', busy: false };
@@ -1039,6 +1159,15 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
       </div>
       <div class="srow">
         <div>
+          <div class="lbl" data-i18n="fb">问题反馈</div>
+          <div class="desc" data-i18n="fb_desc">遇到问题或想提建议？直接写给我们，会带上必要的环境信息。</div>
+        </div>
+        <div class="sfield">
+          <button class="btn-ghost" onclick="openFeedback()" data-i18n="fb_open">反馈问题</button>
+        </div>
+      </div>
+      <div class="srow">
+        <div>
           <div class="lbl" data-i18n="models">模型</div>
           <div class="desc" id="modelDesc" data-i18n="models_desc">转写与纪要使用的本地模型文件。</div>
         </div>
@@ -1063,6 +1192,57 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
         <button class="btn-ghost" onclick="closeFirst()" data-i18n="first_later">稍后再说</button>
       </div>
       <div class="desc" data-i18n="first_hint">推荐组合：ggml-large-v3-turbo-q5_0（574 MB）+ Qwen3.5-2B-Q4_K_M（1.2 GB），首次下载后一直复用。</div>
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="fbMask" hidden onclick="if(event.target===this)closeFeedback()">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <h3 data-i18n="fb_title">问题反馈</h3>
+      <button class="x" onclick="closeFeedback()" aria-label="关闭">✕</button>
+    </div>
+    <div class="sheet-b">
+      <div class="fbf">
+        <div>
+          <label class="flabel" for="fbKind" data-i18n="fb_kind">类型</label>
+          <select id="fbKind">
+            <option value="bug" data-i18n="fb_kind_bug">问题 / Bug</option>
+            <option value="idea" data-i18n="fb_kind_idea">功能建议</option>
+            <option value="other" data-i18n="fb_kind_other">其他</option>
+          </select>
+        </div>
+        <div>
+          <label class="flabel" for="fbTitle" data-i18n="fb_subject">标题</label>
+          <input id="fbTitle" type="text" maxlength="120" spellcheck="false" autocomplete="off"
+                 placeholder="一句话说清问题" data-i18n-ph="fb_subject_ph">
+        </div>
+        <div>
+          <label class="flabel" for="fbBody" data-i18n="fb_detail">详细描述</label>
+          <textarea id="fbBody" maxlength="4000"
+                    placeholder="做了什么、看到什么、期望什么；能复现的步骤最有用"
+                    data-i18n-ph="fb_detail_ph"></textarea>
+        </div>
+        <div>
+          <label class="flabel" for="fbContact" data-i18n="fb_contact">联系方式（可选）</label>
+          <input id="fbContact" type="text" maxlength="120" spellcheck="false" autocomplete="off"
+                 placeholder="邮箱 / 微信，方便追问" data-i18n-ph="fb_contact_ph">
+        </div>
+        <div>
+          <label class="chk">
+            <input id="fbDiagOn" type="checkbox" checked onchange="document.getElementById('fbDiagWrap').hidden=!this.checked">
+            <span data-i18n="fb_diag">附带环境信息（版本、系统、模型名、最近日志）</span>
+          </label>
+          <div id="fbDiagWrap"><pre class="fb-diag" id="fbDiag">…</pre></div>
+          <div class="mhint" style="margin-top:6px" data-i18n="fb_privacy">只包含上面这些环境信息，不含会议标题、转写文字、笔记或录音。</div>
+        </div>
+      </div>
+      <div class="fb-foot">
+        <div class="fb-status" id="fbStatus"></div>
+        <button class="btn-ghost" onclick="fbCopy()" data-i18n="fb_copy">复制内容</button>
+        <button class="btn-ghost" onclick="closeFeedback()" data-i18n="fb_cancel">取消</button>
+        <button class="primary" id="fbSendBtn" onclick="fbSend()" data-i18n="fb_send">发送</button>
+      </div>
     </div>
   </div>
 </div>

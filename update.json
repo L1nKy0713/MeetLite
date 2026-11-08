@@ -1,15 +1,15 @@
 {
-  "version": "1.0.4",
+  "version": "1.1.0",
   "published": "2026-11-08",
-  "notes": "1.0.4：移除对第三方 llama-helper 的探测，摘要全走 llama-server；/api/system 不再暴露本机路径；README 增加独立实现声明。",
+  "notes": "1.1.0：新增「问题反馈」——设置里可直接提交问题/建议，附带脱敏环境信息（版本、系统、模型名、最近日志，不含会议内容），支持 webhook 直发、本地归档与 GitHub 预填三种通道；仓库侧提供每周一 08:00 自动汇总的 Actions 工作流与 Cloudflare Worker 接收端。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.4/MeetLite-1.0.4.zip",
-    "size": 1090634,
-    "sha256": "ddf4eb68a95863aaccd4a5670aef27ee69c586e21bcf6b1f8ba78160160cc708"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.0/MeetLite-1.1.0.zip",
+    "size": 1080741,
+    "sha256": "4ed0aaefe8180f9cd699ae8af9a9d593108ecb90c678c467935a31cce56c38e6"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.0.4/MeetLite-1.0.4-win.zip",
-    "size": 22983227,
-    "sha256": "b62440091768e23f6e13d586a3a04f0b7e522cbda5397d1dbae4cd6790f1ce93"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.0/MeetLite-1.1.0-win.zip",
+    "size": 24070227,
+    "sha256": "48f7fbd1e27dd554574ef26bab891db95e5281d94ebd47c4b0f17b7932bcfc10"
   }
 }

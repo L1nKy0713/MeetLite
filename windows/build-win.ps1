@@ -54,6 +54,7 @@ Get-ChildItem "$Stage\runtime\python*._pth" | ForEach-Object {
 Write-Host "[3/6] 拷贝后端"
 $files = @('server.py','capture.py','config.py','llm.py','model_manager.py','models.json',
            'platforms.py','store.py','summarize.py','updater.py','whisper_engine.py',
+           'feedback.py','audiodec.py',
            'update.json','README.md','THIRD_PARTY.md','LICENSE')
 foreach ($f in $files) {
     if (Test-Path $f) { Copy-Item $f "$Stage\app\" -Force }
