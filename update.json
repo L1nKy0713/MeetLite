@@ -1,15 +1,15 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "published": "2026-11-08",
-  "notes": "1.4.0：按 Windows 1.3.1 实机反馈修了一整条启动链。\n\n· 首次启动不再直接退出：没有模型时照常起服务，界面里的「先准备两个本地模型」向导能正常打开（之前是黑窗一闪就没了）。\n· Windows 绿色包自带运行时找不到 app 目录的问题已修（_pth 缺一行，导致 ModuleNotFoundError: audiodec）。\n· 外壳启动失败「已添加项…HTTPS_PROXY/https_proxy」已修（改用 -X utf8，不再动进程环境变量）。\n· 双击没反应已修（Shell.cs 里补了 _win.Show()；之前主窗口压根没建出来，只剩托盘）。\n· 外壳编译错误 CS0103 BeginInvoke 已修，外壳源码现在能编过。\n· 记日志/请求处理：POST 没读请求体会污染 keep-alive 连接（日志里的 Bad request syntax），已修。\n· 采集源下拉框首次打开是空的，已改成首屏同步探测设备。\n· 高分屏 125%/150% 缩放下窗口偏小、右上角下拉被裁，已改用 Dpi 自动缩放并按屏幕可用区域限制尺寸。\n\nWindows 包：本版改为双击「启动.bat」（或 start.bat）运行，用系统浏览器打开界面，功能与原生窗口一致；原生窗口壳需要自带 VS 编译（源码在仓库 windows/），编译好的 MeetLite.exe 放进同目录会被自动优先使用。",
+  "notes": "1.4.1：修 1.4.0 在 Windows 上实测出的 5 个问题。\n\n· 双击 start.bat 满屏「不是内部或外部命令」已修：包内启动脚本之前是 LF 换行（cmd.exe 靠 CR 判行，LF-only 会让 if/goto/括号分组整段错位）。现在由构建脚本生成并断言必须是 CRLF，文件名也改成纯 ASCII。\n· 包内不再有两份一模一样的启动脚本，只留一个 start.bat；说明文件改成 README.txt（中文名在非中文 Windows 上会变乱码）。\n· 高分屏窗口偏小、文字发虚已修（真因）：.NET Framework 4.8 忽略 csproj 里的 ApplicationHighDpiMode，进程启动后再调 SetProcessDpiAwareness 只会拿到 E_ACCESSDENIED。改为在 app.manifest 里声明 PerMonitorV2，窗口尺寸按「CSS 像素 × dpi/96」算，并在 DpiChanged 时重算。125% 缩放下 CSS 视口从 976 恢复到 1220，右上角下拉全部可见。\n· 打包脚本与产物对不上已修：没有 .NET SDK 时不再中断（外壳是可选项），新增 -SkipShell / -ShellExe 两个开关，冒烟自检改成按有没有外壳分别执行，并加了「CSS 视口 ≥1100」的 DPI 回归检查。\n· 使用说明里「关闭到后台 / 托盘双击 / 双击没反应」几段在浏览器模式下不成立，已按两种模式分别重写。\n\nWindows 包：双击 start.bat（浏览器界面，功能与原生窗口一致）。想要原生窗口 + 托盘，用 dotnet publish 编 windows/MeetLite.Win，把 MeetLite.exe 放进同目录即可，start.bat 会自动优先使用。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.0/MeetLite-1.4.0.zip",
-    "size": 1125988,
-    "sha256": "e91dc5a2852e23dab115d77eaf18ead02b48d94f240d48556deacba23df615a6"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.1/MeetLite-1.4.1.zip",
+    "size": 1125990,
+    "sha256": "bec0ff59621b4879c37d7abfbc61b47566c40a7ead61749c258aa572aff0c3bb"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.0/MeetLite-1.4.0-win.zip",
-    "size": 24172906,
-    "sha256": "2123a6fae2ba77acd5d00c2dee587f8b791b6ed62845232ca7929d5f98d8e805"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.1/MeetLite-1.4.1-win.zip",
+    "size": 24172455,
+    "sha256": "a0d512a28ff3b06b250a8c362b749f81b68a85498104b451cec635b22c90ba9a"
   }
 }

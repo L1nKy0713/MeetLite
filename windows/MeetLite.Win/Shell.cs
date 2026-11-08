@@ -14,16 +14,14 @@ namespace MeetLite.Win;
 
 internal static class Program
 {
-    [DllImport("shcore.dll")]
-    private static extern int SetProcessDpiAwareness(int value);
-
     [STAThread]
     private static void Main()
     {
         // net48 没有 ApplicationConfiguration.Initialize()，等价写法：
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        try { SetProcessDpiAwareness(2); } catch { }   // PerMonitorV2
+        // DPI 感知由 app.manifest 声明（net48 没有 ApplicationHighDpiMode，运行期再调
+        // SetProcessDpiAwareness 只会拿到 E_ACCESSDENIED 并被静默吞掉 —— 1.3.1 的坑）。
         using var shell = new Shell();
         Application.Run(shell);
     }
@@ -54,14 +52,11 @@ internal sealed class Shell : ApplicationContext
         Directory.CreateDirectory(_dataDir);
 
         _win.Text = "MeetLite";
-        // AutoScaleMode.Font 会按设计期字体比例整体缩放（100% 缩放的机器上实测变成
-        // 976x640，右上角"麦克风"下拉被裁掉一截）。改用 Dpi，并按工作区尺寸 clamp。
-        _win.AutoScaleMode = AutoScaleMode.Dpi;
-        var wa = Screen.PrimaryScreen.WorkingArea;
-        _win.ClientSize = new Size(
-            Math.Min(1220, Math.Max(880, wa.Width - 120)),
-            Math.Min(800, Math.Max(540, wa.Height - 100)));
-        _win.MinimumSize = new Size(880, 540);
+        // 一律不做 WinForms 自动缩放：窗口尺寸完全由 ApplyWindowSize() 按「CSS 像素 × dpi/96」
+        // 算出来。AutoScaleMode.Font 会按设计期字体再缩一次（125% 的机器上 1220x800 变成 976x640，
+        // 右上角三个下拉被裁）；AutoScaleMode.Dpi 又依赖进程 DPI 感知是否真的生效（net48 上常没有）。
+        _win.AutoScaleMode = AutoScaleMode.None;
+        ApplyWindowSize();
         _win.StartPosition = FormStartPosition.CenterScreen;
         _win.BackColor = Color.FromArgb(247, 246, 243);
         _win.Icon = LoadIcon();
@@ -92,7 +87,12 @@ internal sealed class Shell : ApplicationContext
         };
         _tray.DoubleClick += (_, _) => ShowWindow();
 
-        _win.Shown += async (_, _) => await InitWebView();
+        _win.Shown += async (_, _) =>
+        {
+            ApplyWindowSize();          // 句柄建好后才拿得到真实 DeviceDpi（构造期恒为 96）
+            await InitWebView();
+        };
+        _win.DpiChanged += (_, _) => ApplyWindowSize();   // 拖到另一块不同缩放的屏幕上
         // 必须先 Show 一次：Shown 不触发 -> InitWebView 不执行 -> _webReady 永远 false
         // -> TryShowUI 直接 return -> 主窗体连 HWND 都不建，只剩托盘图标（"双击没反应"）。
         _win.Show();
@@ -165,6 +165,30 @@ internal sealed class Shell : ApplicationContext
             });
             TryShowUI();
         }
+    }
+
+    /// <summary>当前窗口所在屏幕的 dpi（96 = 100%）。句柄没建好时按 96 计。</summary>
+    private int DpiOfWindow()
+    {
+        try { return _win.IsHandleCreated ? _win.DeviceDpi : 96; }
+        catch { return 96; }
+    }
+
+    /// <summary>
+    /// 按「CSS 像素」定目标尺寸，再乘 dpi/96 换成物理像素：界面是 HTML，CSS 视口才是布局依据。
+    /// 目标 CSS 尺寸在屏幕可用区域的 1/dpi 缩放下再留出边距，避免高缩放机器上窗口超出屏幕。
+    /// </summary>
+    private void ApplyWindowSize()
+    {
+        double scale = DpiOfWindow() / 96.0;
+        var area = (_win.IsHandleCreated ? Screen.FromHandle(_win.Handle) : Screen.PrimaryScreen).WorkingArea;
+        int cssW = Math.Min(1220, Math.Max(880, (int)(area.Width / scale) - 40));
+        int cssH = Math.Min(800, Math.Max(540, (int)(area.Height / scale) - 70));
+        _win.MinimumSize = new Size((int)Math.Round(880 * scale), (int)Math.Round(540 * scale));
+        _win.ClientSize = new Size((int)Math.Round(cssW * scale), (int)Math.Round(cssH * scale));
+        // 这行是给真机自检用的：CSS 视口 = client/scale，应该 ≈ cssW x cssH
+        _log.AppendLine($"[ui] 窗口 client={_win.ClientSize.Width}x{_win.ClientSize.Height} " +
+                        $"dpi={DpiOfWindow()} scale={scale:0.##} css={cssW}x{cssH}");
     }
 
     private void TryShowUI()

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="MeetLite.Win.app" />
+
+  <!-- 以当前用户权限运行，不请求管理员 -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!-- Win10 / Win11 -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+      <supportedOS Id="{4f476546-9370-4f9a-b3b5-5a3b5e5e8e2b}" />
+    </application>
+  </compatibility>
+
+  <!--
+    DPI 感知必须在清单里声明：.NET Framework 4.8 没有 ApplicationHighDpiMode（那是 .NET 6+ 的属性，
+    net48 会静默忽略），而进程启动后再调 SetProcessDpiAwareness 只会拿到 E_ACCESSDENIED。
+    没有这一段时，125% 缩放的机器上窗口会被系统按位图拉伸 0.8 倍（1220x800 -> 976x640），
+    界面按 976 CSS 像素布局，右上角的下拉框被裁、文字发虚。
+  -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>
