@@ -1,4 +1,4 @@
-"""MeetLite 配置：自动发现已有模型（先自己的目录，再 meetily 的），允许 config.json 覆盖。"""
+"""MeetLite 配置：自动发现已有模型（先自己的目录，再本机其他工具的），允许 config.json 覆盖。"""
 from __future__ import annotations
 
 import json
@@ -8,9 +8,9 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 DATA_DIR = platforms.data_dir()
-MEETILY_DATA = (platforms.meetily_dirs() or [DATA_DIR])[0]
+LEGACY_DATA = (platforms.legacy_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()
 IS_WIN = platforms.IS_WIN
 

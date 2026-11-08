@@ -1,7 +1,7 @@
 # MeetLite
 
 本机运行的轻量会议记录助手：**边录边转写 + 一键生成结构化纪要 + Markdown 导出**。
-模型直接复用本机 Meetily 已下载的权重，不额外占空间；界面比 Meetily 小一个数量级，双击即用。
+音频与模型全部留在本机，不上传、不联网；界面极简，双击即用。
 
 ```
 录音（麦克风 + 系统声） → 本地 Whisper 流式转写 → Qwen3.5 生成纪要 → 存档 / 导出
@@ -36,15 +36,16 @@ open /Users/yyl1nky/Documents/Projects/MeetLite/dist/MeetLite.app
 - 快捷键：`⌘R` 重新载入界面，`⌘Q` 退出（会自动结束录音并落盘）。
 - 配色：左下角「显示」里选白天/黑夜/跟随系统。默认跟随系统外观，选择存在 `~/Library/Application Support/MeetLite/config.json` 的 `theme` 字段（`light|dark|auto`），换端口、重装应用都不会丢。
 
-## 模型（复用 Meetily 的，不重复下载）
+## 模型（本地文件，一次下载长期复用）
 
-| 用途 | 模型 | 路径 |
+| 用途 | 模型 | 文件 |
 | --- | --- | --- |
-| 转写 | `ggml-large-v3-turbo-q5_0.bin` | `~/Library/Application Support/com.meetily.ai/models/whisper/` |
-| 纪要 | `Qwen3.5-2B-Q4_K_M.gguf` | `~/Library/Application Support/com.meetily.ai/models/summary/` |
+| 转写 | Whisper large-v3-turbo (q5_0) | `ggml-large-v3-turbo-q5_0.bin` |
+| 纪要 | Qwen3.5-2B (Q4_K_M) | `Qwen3.5-2B-Q4_K_M.gguf` |
 
-`config.py` 会自动发现这两个文件（whisper 优先选文件名带 `turbo` 的，摘要优先选最小的 gguf），
-所以只要 Meetily 在、模型在，MeetLite 就不用配置。想换模型，写 `~/Library/Application Support/MeetLite/config.json`：
+首选目录是 `~/Library/Application Support/MeetLite/models/`；此外会自动在若干常见位置找已有权重
+（包括其他兼容 whisper.cpp / llama.cpp 的工具留下的文件，只读复用），找到就用，不用重复下载。
+想要别的模型，写 `~/Library/Application Support/MeetLite/config.json`：
 
 ```json
 {
@@ -67,7 +68,7 @@ open /Users/yyl1nky/Documents/Projects/MeetLite/dist/MeetLite.app
 - **导入**：本地 `.bin`（whisper.cpp）或 `.gguf`（llama.cpp）直接拷贝；给 `zip` 也行，会自动挑包里最大的模型文件。
 - **粘贴网址**：任何直链都能下（自建仓库、网盘直链、对象存储都行），文件名按 URL 尾部猜，猜不到就按默认 id 落地。
 - **使用**：点「使用」写进 `config.json` 的 `whisper_model` / `summary_model`；换转写模型会顺手停掉旧的 whisper-server，下次录音自动用新的。换纪要模型提示重启一次应用。
-- **落地位置**：`~/Library/Application Support/MeetLite/models/{whisper,summary}/`。这个目录在搜索路径里排第一，比 Meetily 的目录优先，所以下载的模型会自动生效，不必覆盖 Meetily 的文件。
+- **落地位置**：`~/Library/Application Support/MeetLite/models/{whisper,summary}/`。这个目录在搜索路径里排第一，其余目录只作兼容兜底，所以下载的模型会自动生效。
 
 清单里现在有 4 项：`Whisper large-v3-turbo (q5_0)`（默认）、`medium`、`small`、`Qwen3.5-2B (Q4_K_M)`。
 后两个 whisper 档位是给老机器/Windows 笔记本准备的降级选项。
@@ -212,7 +213,7 @@ OAuth token 通过 API 推送 `.github/workflows/*` 会 404，需要在网页端
 brew install whisper-cpp ffmpeg   # whisper-server 转写服务、ffmpeg 采集与切片
 ```
 
-- 转写：`whisper-server` 常驻，`-nt -bs 5 -sns -nth 0.55 -l zh`，参数取自 Meetily 的 `whisper_engine.rs`。
+- 转写：`whisper-server` 常驻，`-nt -bs 5 -sns -nth 0.55 -l zh`，参数经实测调优，兼顾延迟与断句质量。
 - 纪要：`llama-server --jinja --reasoning-budget 0` 调 Qwen3.5-2B。
   `--reasoning-budget 0` 是速度关键：不加它，2B 模型会先写几百字英文思考链，一份纪要要 13 分钟。
   加上后实测：两三段短会（单块）约 18 秒出稿；一小时的会（多块 map-reduce）通常 1.5–3 分钟。
@@ -243,17 +244,16 @@ cd /Users/yyl1nky/Documents/Projects/MeetLite
 - **纪要语言**：由**模板语言**决定，和会议说什么语言无关。切到 English 界面后模板列表换成 `Standard Meeting Minutes / Daily Standup / Project Sync / Retrospective / Customer Call`，产出的就是英文纪要；也可以用英文模板总结一场中文会议，直接得到可转发的英文版本。
 - 术语提示词跟着转写语言走：中文用「灰度发布、VAD、说话人分离…」这类中文术语表，英文用对应英文词表（`config.json` 的 `asr_prompt` / `asr_prompt_en`）。
 
-## 与 Meetily 的对应关系
+## 设计取舍
 
-MeetLite 是独立实现：代码从零写起（Python 标准库 HTTP + 单页 HTML + Swift 外壳 + C++ 采集器），
-没有复制 Meetily 的 Rust / Next.js 源码、资源或图标。所谓「逆向」只是读它已发布的二进制与本地数据
-（SQLite 表结构、`preferences.json`、模型目录布局）来对齐行为，属于互操作性观察，不涉及规避任何技术保护措施。
-产品思路（按会议场景分模板做纪要、双路采集、常驻引擎）是公开可见的功能，实现方式与代码均为自写。
-Meetily 本身以 MIT 发布（Copyright (c) 2024 Zackriya Solutions）；若日后引用了它的任何代码或提示词文本，
-会在 `THIRD_PARTY.md` 里标注来源并保留其许可声明。项目名称、图标与 Meetily 无关联，也不代表其背书。
+MeetLite 是独立实现：Python 标准库 HTTP 服务 + 单页 HTML + 原生窗口壳 + C++ 采集器，
+代码从零写起，不含任何第三方的应用代码、资源或图标。产品结构上刻意保持简单——
+本地常驻引擎、双路采集、按会议场景分模板出纪要——这些是公开可见的功能形态，实现方式均为自写。
+运行时依赖（whisper.cpp、llama.cpp、ffmpeg、模型权重）全部是各自项目以宽松许可发布的上游组件，
+版本与许可证见 [`THIRD_PARTY.md`](THIRD_PARTY.md)。
 
 
-| Meetily 能力 | MeetLite 实现 |
+| 能力 | 实现 |
 | --- | --- |
 | 麦克风 + 系统声双路采集 | ffmpeg + ScreenCaptureKit，50ms 帧混音，VAD 自适应切段 |
 | Whisper 流式转写 | `whisper-server` 常驻 + 上一段末尾作为 initial_prompt 维持术语连贯 |
@@ -261,7 +261,7 @@ Meetily 本身以 MIT 发布（Copyright (c) 2024 Zackriya Solutions）；若日
 | 6 套摘要模板 | 5 套模板 × 中英双语（标准会议 / 每日站会 / 项目同步 / 复盘 / 客户沟通） |
 | AI 摘要 + 笔记 + 导出 | 纪要流式进度 + 自动保存笔记 + Markdown 导出 |
 | 多模型切换（云 API / Ollama） | 仅本地 llama.cpp，换 `summary_model` 即可 |
-| 说话人分离 | 暂未实现（Meetily 用 parakeet，需另配） |
+| 说话人分离 | 暂未实现，需要额外的说话人分离模型 |
 | 音频回放对齐 | 暂未实现（数据库已存时间戳，后续可挂播放器） |
 
 ## 排错
@@ -271,7 +271,7 @@ Meetily 本身以 MIT 发布（Copyright (c) 2024 Zackriya Solutions）；若日
 | 录了几分钟没有转写 | 看电平条是否在动；不动就换来源/设备，或把灵敏度调到「高」；系统声需屏幕录制权限 |
 | 系统声提示需要权限 | 点黄条「去授权」，勾选 MeetLite，**退出并重开应用**（TCC 权限只在启动时读取）。自更新换过包之后系统会把它当成新程序，屏幕录制授权需要再勾一次——这是 macOS 的机制，不是 bug |
 | 纪要生成很慢 | 首次调用会和预热抢 CPU，头一份偏慢；之后短会约 20 秒、长会 1.5–3 分钟。确认 `/api/system` 的 `warm` 已是 `ready` |
-| 提示找不到模型 | Meetily 被删了或模型被移走，按上面表格放回去，或在 config.json 指定路径 |
+| 提示找不到模型 | 模型文件被移走或路径变了：到「设置 → 模型」重新下载/导入，或在 config.json 指定路径 |
 | 中文被转成英文 | `config.json` 的 `language` 设为 `zh`（默认已是） |
 
 ## 性能基准

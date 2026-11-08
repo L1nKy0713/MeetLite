@@ -1,15 +1,15 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.2",
   "published": "2026-11-08",
-  "notes": "1.3.1：设置里的「语言」一项改成中英对照（语言 · Language），英文界面下显示为 Language · 语言，非中文用户也能一眼找到切换入口。\n\nWindows: MeetLite-1.3.1-win.zip（首次启动按提示下载模型）",
+  "notes": "1.3.2：把界面与文档里沿用旧名字的模型描述全部改成中性表述，产品对外只描述自己的实现与上游组件；模型找不到时的提示也改成可操作的引导（到「设置 → 模型」下载或导入）。\n\nWindows: MeetLite-1.3.2-win.zip（首次启动按提示下载模型）",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.1/MeetLite-1.3.1.zip",
-    "size": 1112321,
-    "sha256": "919268cbb731eae675baf9ccb8bff72c2b321a76efe5cf4004d083a7ddd9388d"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.2/MeetLite-1.3.2.zip",
+    "size": 1125728,
+    "sha256": "37273dc167209c72b25c8eea4a65527631c01b5f0b2c4abb7b7a84177d5634a3"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.1/MeetLite-1.3.1-win.zip",
-    "size": 24243138,
-    "sha256": "2392c3345374f26867fdd9147c6cacd6285f2c93707595cb1c1d0742b79e3f42"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.2/MeetLite-1.3.2-win.zip",
+    "size": 24243356,
+    "sha256": "01508432653831563495bb1dad0d0eebf0ed8e0460abe3749243a9fa1a9f6bda"
   }
 }

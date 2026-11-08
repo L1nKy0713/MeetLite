@@ -68,7 +68,7 @@ def target_dir(kind: str) -> str:
 
 
 def installed_path(item: dict) -> str:
-    """清单里的相对文件名，先看本程序目录，再看 meetily 目录。"""
+    """清单里的相对文件名，先看本程序目录，再看本机其他工具留下的目录。"""
     name = os.path.basename(item.get("file") or "")
     if not name:
         return ""
@@ -76,7 +76,7 @@ def installed_path(item: dict) -> str:
     kind = item.get("kind", "whisper")
     sub = "whisper" if kind == "whisper" else "summary"
     candidates = [os.path.join(target_dir(kind), name)]
-    for d in platforms.meetily_dirs():
+    for d in platforms.legacy_dirs():
         candidates.append(os.path.join(str(d), "models", sub, name))
         candidates.append(os.path.join(str(d), "models", name))
     for p in candidates:
@@ -150,7 +150,7 @@ def install(model_id: str, progress=None, url: str = "") -> dict:
     sources = [url] if url else []
     sources += [s for s in (item.get("sources") or []) if s]
     if not sources:
-        raise RuntimeError("该模型没有配置下载地址")
+        raise RuntimeError("该模型没有内置下载源：请在上方粘贴直链，或点「导入文件」选择本地模型文件")
 
     last = None
     for src in sources:

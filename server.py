@@ -898,7 +898,7 @@ def main():
         pass
 
     if not cfg.get("whisper_model"):
-        print("找不到 whisper 模型，请先运行 meetily 下载模型，或在 config.json 指定 whisper_model")
+        print("找不到 whisper 模型：请到「设置 → 模型」下载或导入，或在 config.json 指定 whisper_model")
         sys.exit(1)
     if not cfg.get("summary_model"):
         print("找不到摘要模型（.gguf）")

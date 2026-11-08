@@ -32,8 +32,8 @@ def data_dir() -> Path:
     return Path(base) / APP_NAME
 
 
-def meetily_dirs() -> list[Path]:
-    """可能存放 meetily 已下载模型的目录（只读复用，找不到就用自带目录）。"""
+def legacy_dirs() -> list[Path]:
+    """本机其他同类工具可能已下载模型的目录（只读复用，找不到就用自带目录）。"""
     if IS_WIN:
         out: list[Path] = []
         for env in ("LOCALAPPDATA", "APPDATA"):
@@ -48,8 +48,8 @@ def meetily_dirs() -> list[Path]:
 
 
 def model_dirs() -> list[Path]:
-    """模型搜索路径：先自己的目录（首启动下载到这儿），再 meetily 的。"""
-    return [data_dir() / "models"] + [d / "models" for d in meetily_dirs()]
+    """模型搜索路径：先自己的目录（首启动下载到这儿），再其他工具的。"""
+    return [data_dir() / "models"] + [d / "models" for d in legacy_dirs()]
 
 
 # ---------------------------------------------------------------- 系统声采集
