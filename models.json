@@ -46,7 +46,7 @@
       "id": "qwen3.5-2b-q4_k_m",
       "kind": "summary",
       "name": "Qwen3.5-2B (Q4_K_M)",
-      "desc": "纪要模型，2B 量化版，纯 CPU 也能流畅生成。本机已有会自动识别；否则粘贴直链下载或「导入文件」。",
+      "desc": "纪要模型，2B 量化版，纯 CPU 也能流畅生成，中文表达自然。约 1.2 GB。",
       "file": "Qwen3.5-2B-Q4_K_M.gguf",
       "size": 1280835840,
       "sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
