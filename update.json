@@ -1,15 +1,23 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "published": "2026-11-08",
-  "notes": "1.4.1：修 1.4.0 在 Windows 上实测出的 5 个问题。\n\n· 双击 start.bat 满屏「不是内部或外部命令」已修：包内启动脚本之前是 LF 换行（cmd.exe 靠 CR 判行，LF-only 会让 if/goto/括号分组整段错位）。现在由构建脚本生成并断言必须是 CRLF，文件名也改成纯 ASCII。\n· 包内不再有两份一模一样的启动脚本，只留一个 start.bat；说明文件改成 README.txt（中文名在非中文 Windows 上会变乱码）。\n· 高分屏窗口偏小、文字发虚已修（真因）：.NET Framework 4.8 忽略 csproj 里的 ApplicationHighDpiMode，进程启动后再调 SetProcessDpiAwareness 只会拿到 E_ACCESSDENIED。改为在 app.manifest 里声明 PerMonitorV2，窗口尺寸按「CSS 像素 × dpi/96」算，并在 DpiChanged 时重算。125% 缩放下 CSS 视口从 976 恢复到 1220，右上角下拉全部可见。\n· 打包脚本与产物对不上已修：没有 .NET SDK 时不再中断（外壳是可选项），新增 -SkipShell / -ShellExe 两个开关，冒烟自检改成按有没有外壳分别执行，并加了「CSS 视口 ≥1100」的 DPI 回归检查。\n· 使用说明里「关闭到后台 / 托盘双击 / 双击没反应」几段在浏览器模式下不成立，已按两种模式分别重写。\n\nWindows 包：双击 start.bat（浏览器界面，功能与原生窗口一致）。想要原生窗口 + 托盘，用 dotnet publish 编 windows/MeetLite.Win，把 MeetLite.exe 放进同目录即可，start.bat 会自动优先使用。",
+  "notes": [
+    "Windows：包内现在带真机编译、内嵌 PerMonitorV2 清单的 MeetLite.exe，双击 start.bat 直接出原生窗口（托盘、关闭三选项都回来了）",
+    "Windows：DPI 修复落地 —— 窗口按 CSS 像素 × dpi/96 计算，125% 缩放下 CSS 视口 1220×746，右上角下拉不再被裁，文字不再发虚",
+    "Windows：start.bat 单一入口（纯 ASCII + CRLF），删除重复且会乱码的「启动.bat」；说明文件改 ASCII 名 README.txt",
+    "构建：build-win.ps1 默认复用 windows/prebuilt 里已验过的外壳，没有 .NET SDK 也能出完整包；-SkipShell 可强制浏览器模式",
+    "macOS：同步版本号与文档，无功能变化"
+  ],
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.1/MeetLite-1.4.1.zip",
-    "size": 1125990,
-    "sha256": "bec0ff59621b4879c37d7abfbc61b47566c40a7ead61749c258aa572aff0c3bb"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.2/MeetLite-1.4.2.zip",
+    "size": 1112704,
+    "sha256": "57e0cee65751233c7c7b842eda57a6d9d558d52443efad56b2ca7faa6b523150",
+    "version": "1.4.2"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.1/MeetLite-1.4.1-win.zip",
-    "size": 24172455,
-    "sha256": "a0d512a28ff3b06b250a8c362b749f81b68a85498104b451cec635b22c90ba9a"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.2/MeetLite-1.4.2-win.zip",
+    "size": 24246065,
+    "sha256": "08bfedac1898c28bb15b75e6335c40802278635338d09133ad6dfb7c94b5ef49",
+    "version": "1.4.2"
   }
 }

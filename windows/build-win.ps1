@@ -37,8 +37,13 @@ New-Item -ItemType Directory -Force -Path $Stage, "$Stage\app", "$Stage\app\bin"
 
 # ---------------------------------------------------------------- 1. C# 外壳
 Write-Host "[1/6] WebView2 外壳"
+# 仓库里带了一份真机编过、内嵌 PerMonitorV2 manifest 的外壳；没有 .NET SDK 时直接用它
+$prebuilt = Join-Path $Root 'windows\prebuilt\MeetLite.exe'
+if (-not $ShellExe -and (Test-Path $prebuilt)) { $ShellExe = $prebuilt }
 if ($ShellExe) {
     Copy-Item $ShellExe $Stage -Force
+    $cfg = "$ShellExe.config"
+    if (Test-Path $cfg) { Copy-Item $cfg $Stage -Force }
     Write-Host "      用现成的外壳：$ShellExe"
 } elseif ($SkipShell) {
     Write-Host "      -SkipShell：跳过，产物为 start.bat + 浏览器模式" -ForegroundColor Yellow
