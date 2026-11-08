@@ -10,15 +10,29 @@ final class ThemeHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+// 页面决定好「关窗怎么办」后回调原生壳：后台 or 退出
+final class CloseHandler: NSObject, WKScriptMessageHandler {
+    weak var app: AppDelegate?
+    func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
+        let action = (m.body as? [String: Any])?["action"] as? String ?? ""
+        DispatchQueue.main.async {
+            guard let app = self.app else { return }
+            if action == "background" { app.hideToBackground() } else { app.quitNow() }
+        }
+    }
+}
+
 // MeetLite 原生壳：拉起内置 Python 服务 → 等就绪 → WKWebView 打开界面
-final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
     var window: NSWindow!
     var web: WKWebView!
     var proc: Process?
     var port: Int = 0
     var ready = false
     var themeHandler: ThemeHandler?
+    var closeHandler: CloseHandler?
     var themeMode = "auto"
+    var hidToBackground = false
 
     // MARK: 生命周期
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -28,7 +42,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         DispatchQueue.global().async { self.boot() }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { true }
+    // 关窗不等于退出：具体行为交给 windowShouldClose 判断（后台/退出/询问）
+    func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }
+
+    // MARK: 关窗策略
+    /// 读取 config.json 里的 close_action：ask / background / quit
+    static func savedCloseAction() -> String {
+        let p = ("~/Library/Application Support/MeetLite/config.json" as NSString).expandingTildeInPath
+        guard let d = FileManager.default.contents(atPath: p),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let a = o["close_action"] as? String,
+              ["ask", "background", "quit"].contains(a) else { return "ask" }
+        return a
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        switch Self.savedCloseAction() {
+        case "background":
+            hideToBackground()
+            return false
+        case "quit":
+            quitNow()
+            return false
+        default:
+            break
+        }
+        // ask：交给页面弹窗（页面不在/没接管时直接退出，避免关不掉）
+        guard ready else { quitNow(); return false }
+        web.evaluateJavaScript("typeof window.mlAskClose === 'function' ? (window.mlAskClose() === true) : false") { r, _ in
+            if (r as? Bool) != true { self.quitNow() }
+        }
+        return false
+    }
+
+    /// 收窗口但保留进程：Python 服务、录音、转写都继续跑；点 Dock 图标回来
+    func hideToBackground() {
+        hidToBackground = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            self.window.orderOut(nil)
+            NSApp.hide(nil)
+        }
+    }
+
+    func quitNow() {
+        NSApp.terminate(nil)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag, let w = window {
+            hidToBackground = false
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        return true
+    }
+
+    func applicationDidBecomeActive(_ note: Notification) {
+        guard hidToBackground, let w = window, !w.isVisible else { return }
+        hidToBackground = false
+        w.makeKeyAndOrderFront(nil)
+    }
 
     func applicationWillTerminate(_ note: Notification) {
         if let p = proc, p.isRunning {
@@ -57,10 +130,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         themeHandler = ThemeHandler()
         themeHandler?.app = self
         cfg.userContentController.add(themeHandler!, name: "theme")
+        closeHandler = CloseHandler()
+        closeHandler?.app = self
+        cfg.userContentController.add(closeHandler!, name: "winclose")
         web = WKWebView(frame: rect, configuration: cfg)
         web.navigationDelegate = self
         web.uiDelegate = self
         web.setValue(false, forKey: "drawsBackground")
+        window.delegate = self
         window.contentView = web
         applyChromeTheme(themeMode)
         window.makeKeyAndOrderFront(nil)

@@ -136,6 +136,8 @@ internal sealed class Shell : ApplicationContext
             _web.CoreWebView2.DocumentTitleChanged += (_, _) =>
                 _win.Text = string.IsNullOrWhiteSpace(_web.CoreWebView2.DocumentTitle)
                     ? "MeetLite" : _web.CoreWebView2.DocumentTitle;
+            // 网页里的「关闭窗口时」弹层选完，通过 chrome.webview 桥发回来
+            _web.CoreWebView2.WebMessageReceived += OnWebMessage;
 
             _webReady = true;
             TryShowUI();
@@ -303,10 +305,63 @@ internal sealed class Shell : ApplicationContext
             "录音与转写在后台继续，双击托盘图标回到界面。", ToolTipIcon.None);
     }
 
+    // 关窗口红点的行为：ask=每次弹层询问 / background=藏到托盘继续跑 / quit=直接退出
+    // 与 mac 端共用同一个 config.json 键 close_action，设置页也能改。
+    private string ReadCloseAction()
+    {
+        try
+        {
+            var p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "MeetLite", "config.json");
+            if (!File.Exists(p)) return "ask";
+            var t = File.ReadAllText(p);
+            var k = t.IndexOf("\"close_action\"", StringComparison.Ordinal);
+            if (k < 0) return "ask";
+            var q1 = t.IndexOf('"', t.IndexOf(':', k) + 1);
+            if (q1 < 0) return "ask";
+            var q2 = t.IndexOf('"', q1 + 1);
+            if (q2 < 0) return "ask";
+            var v = t.Substring(q1 + 1, q2 - q1 - 1);
+            return v == "background" || v == "quit" ? v : "ask";
+        }
+        catch { return "ask"; }
+    }
+
+    private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var json = e.WebMessageAsJson ?? "";
+            if (json.IndexOf("winclose", StringComparison.Ordinal) < 0) return;
+            if (json.IndexOf("background", StringComparison.Ordinal) >= 0) { HideToTray(); return; }
+            if (json.IndexOf("quit", StringComparison.Ordinal) >= 0) { _exiting = true; BeginInvoke(new Action(Quit)); }
+        }
+        catch { }
+    }
+
     private void OnClosing(object? sender, FormClosingEventArgs e)
     {
         if (_exiting) return;
         e.Cancel = true;
+        var act = ReadCloseAction();
+        if (act == "quit")
+        {
+            _exiting = true;
+            BeginInvoke(new Action(Quit));
+            return;
+        }
+        if (act == "background") { HideToTray(); return; }
+        // ask：让网页里的弹层接管（三个选项 +「总是使用该选项」）
+        try
+        {
+            if (_web.CoreWebView2 is not null)
+            {
+                _web.CoreWebView2.ExecuteScriptAsync(
+                    "typeof window.mlAskClose==='function' ? (window.mlAskClose(), 'ok') : 'no'");
+                return;
+            }
+        }
+        catch { }
         HideToTray();
     }
 

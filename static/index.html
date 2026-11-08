@@ -305,6 +305,11 @@ const I18N = {
     models: '模型', models_desc: '转写与纪要使用的本地模型文件。', model_manage: '管理模型',
     trash: '回收站', trash_desc: '删除的会议先放这里，保留 7 天后自动清理。',
     trash_open: '打开回收站', trash_empty: '回收站是空的', trash_none_open: '没有可清理的项',
+    close_action: '关闭窗口时', close_action_desc: '点窗口左上角红点时：退出程序，还是留在后台继续录音。',
+    close_ask: '每次询问', close_bg: '放到后台', close_quit: '直接退出',
+    close_title: '关闭 MeetLite', close_msg: '要退出程序，还是放到后台继续运行？在后台时录音与转写都会继续。',
+    close_remember: '总是使用该选项', close_bg_btn: '放到后台', close_quit_btn: '退出程序',
+    close_bg_toast: '已放到后台，录音还在跑。点 Dock 图标可以回到窗口。',
     trash_restore: '恢复', trash_purge: '彻底删除', trash_clear: '清空回收站',
     trash_clear_confirm: '清空回收站？里面的 {n} 条会议会被彻底删除，无法恢复。',
     trash_purge_confirm: '彻底删除「{title}」？这一步不可撤销。',
@@ -375,6 +380,11 @@ const I18N = {
     models: 'Models', models_desc: 'Local model files used for transcription and minutes.', model_manage: 'Manage',
     trash: 'Trash', trash_desc: 'Deleted meetings stay here for 7 days, then are removed automatically.',
     trash_open: 'Open trash', trash_empty: 'Trash is empty', trash_none_open: 'Nothing to clean up',
+    close_action: 'When closing', close_action_desc: 'Clicking the red close button: quit, or keep running in the background.',
+    close_ask: 'Ask', close_bg: 'Background', close_quit: 'Quit',
+    close_title: 'Close MeetLite', close_msg: 'Quit the app, or keep it running in the background? Recording and transcription keep going in the background.',
+    close_remember: 'Always use this choice', close_bg_btn: 'Keep in background', close_quit_btn: 'Quit app',
+    close_bg_toast: 'Running in the background. Click the Dock icon to reopen.',
     trash_restore: 'Restore', trash_purge: 'Delete forever', trash_clear: 'Empty trash',
     trash_clear_confirm: 'Empty the trash? {n} meeting(s) will be deleted permanently.',
     trash_purge_confirm: 'Delete "{title}" permanently? This cannot be undone.',
@@ -451,7 +461,9 @@ function closeSettings(){
   document.body.style.overflow = '';
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('#settingsMask').hidden) closeSettings();
+  if (e.key !== 'Escape') return;
+  if (!$('#closeMask').hidden) { closeCloseAsk(); return; }
+  if (!$('#settingsMask').hidden) closeSettings();
 });
 // ---------------- 回收站 ----------------
 let TRASH = { items: [], days: 7 };
@@ -849,17 +861,64 @@ async function refreshTemplates(){
 }
 
 const THEME_KEY = 'meetlite.theme';
-let PREF = { theme: 'auto', perm_dismissed: false, ui_lang: 'zh', asr_lang: 'auto' };
+let PREF = { theme: 'auto', perm_dismissed: false, ui_lang: 'zh', asr_lang: 'auto', close_action: 'ask' };
 async function loadPrefs(){
   try{
     const j = await (await fetch('/api/prefs')).json();
     if(j && j.ok){ PREF.theme = j.theme || 'auto'; PREF.perm_dismissed = !!j.perm_dismissed;
-      PREF.ui_lang = j.ui_lang || 'zh'; PREF.asr_lang = j.asr_lang || 'auto'; }
+      PREF.ui_lang = j.ui_lang || 'zh'; PREF.asr_lang = j.asr_lang || 'auto';
+      PREF.close_action = (j.close_action === 'background' || j.close_action === 'quit') ? j.close_action : 'ask'; }
   }catch(e){}
 }
 function savePrefs(patch){
   Object.assign(PREF, patch);
   fetch('/api/prefs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch)}).catch(()=>{});
+}
+/* 关闭窗口行为：ask=问 / background=留后台 / quit=退出 */
+function applyCloseCtl(){
+  document.querySelectorAll('#closeCtl button').forEach(b=>{
+    b.classList.toggle('on', b.getAttribute('data-close-opt') === (PREF.close_action || 'ask'));
+  });
+}
+function setCloseAction(v){
+  savePrefs({ close_action: v });
+  applyCloseCtl();
+}
+/* 原生壳点红点时调用本函数；返回 true = 交给页面弹窗决定 */
+window.mlAskClose = function(){
+  const mask = $('#closeMask');
+  if(!mask) return false;
+  const cb = $('#closeRemember'); if(cb) cb.checked = false;
+  mask.hidden = false;
+  document.body.style.overflow = 'hidden';
+  return true;
+};
+function closeCloseAsk(){
+  const mask = $('#closeMask'); if(mask) mask.hidden = true;
+  document.body.style.overflow = '';
+}
+/* 交给原生壳执行真正的「藏后台 / 退出」 */
+function bridgeClose(action){
+  try{
+    const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.winclose;
+    if(h){ h.postMessage({ action: action }); return true; }
+  }catch(_){}
+  try{
+    // Windows：WebView2 的 chrome.webview 桥
+    const w = window.chrome && window.chrome.webview;
+    if(w && typeof w.postMessage === 'function'){ w.postMessage({ type: 'winclose', action: action }); return true; }
+  }catch(_){}
+  return false;
+}
+function closeChoose(action){
+  const cb = $('#closeRemember');
+  if(cb && cb.checked) savePrefs({ close_action: action });
+  closeCloseAsk();
+  if(action === 'background'){
+    if(!bridgeClose('background')) toast(t('close_bg_toast'));
+  }else{
+    if(!bridgeClose('quit')){ try{ window.close(); }catch(_){} }
+  }
 }
 function resolvedTheme(mode){
   if(mode === 'dark' || mode === 'light') return mode;
@@ -1286,7 +1345,7 @@ if(window.matchMedia){
     if((PREF.theme || 'auto') === 'auto') applyTheme('auto');
   });
 }
-loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n(); applyTheme(PREF.theme); boot(); });
+loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n(); applyTheme(PREF.theme); applyCloseCtl(); boot(); });
 </script>
 <div id="toast" role="status" aria-live="polite"></div>
 <div class="mask" id="askMask" hidden onclick="if(event.target===this)askClose(false)">
@@ -1296,6 +1355,25 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
     <div class="ask-foot">
       <button class="btn-ghost" id="askCancel" onclick="askClose(false)">取消</button>
       <button class="primary" id="askOk" onclick="askClose(true)">确定</button>
+    </div>
+  </div>
+</div>
+<div class="mask" id="closeMask" hidden>
+  <div class="sheet" style="width:min(440px,90vw)" role="dialog" aria-modal="true" aria-labelledby="closeTitle">
+    <div class="sheet-h">
+      <h3 id="closeTitle" data-i18n="close_title">关闭 MeetLite</h3>
+      <button class="x" onclick="closeCloseAsk()" aria-label="关闭">✕</button>
+    </div>
+    <div class="sheet-b">
+      <div class="desc" id="closeMsg" data-i18n="close_msg" style="font-size:12.5px;line-height:1.6"></div>
+      <label class="chk-row" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim);cursor:pointer">
+        <input type="checkbox" id="closeRemember" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer">
+        <span data-i18n="close_remember">总是使用该选项</span>
+      </label>
+    </div>
+    <div class="ask-foot">
+      <button class="btn-ghost" id="closeBgBtn" onclick="closeChoose('background')" data-i18n="close_bg_btn">放到后台</button>
+      <button class="primary" id="closeQuitBtn" onclick="closeChoose('quit')" data-i18n="close_quit_btn">退出程序</button>
     </div>
   </div>
 </div>
@@ -1343,7 +1421,7 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
       <div class="srow">
         <div>
           <div class="lbl" data-i18n="about">更新</div>
-          <div class="desc" id="verDesc">MeetLite 1.0.0</div>
+          <div class="desc" id="verDesc">MeetLite</div>
         </div>
         <div class="sfield">
           <button class="btn-ghost" id="btnCheckUpd" onclick="checkUpdate()" data-i18n="check_update">检查更新</button>
@@ -1369,6 +1447,19 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
         </div>
         <div class="sfield">
           <button class="btn-ghost" onclick="openTrash()" data-i18n="trash_open">打开回收站</button>
+        </div>
+      </div>
+      <div class="srow">
+        <div>
+          <div class="lbl" data-i18n="close_action">关闭窗口时</div>
+          <div class="desc" data-i18n="close_action_desc">点窗口左上角红点时：退出程序，还是留在后台继续录音。</div>
+        </div>
+        <div class="sfield">
+          <div class="seg-ctl" id="closeCtl">
+            <button data-close-opt="ask" onclick="setCloseAction('ask')" data-i18n="close_ask">每次询问</button>
+            <button data-close-opt="background" onclick="setCloseAction('background')" data-i18n="close_bg">放到后台</button>
+            <button data-close-opt="quit" onclick="setCloseAction('quit')" data-i18n="close_quit">直接退出</button>
+          </div>
         </div>
       </div>
       <div class="srow">

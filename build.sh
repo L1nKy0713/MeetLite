@@ -26,15 +26,19 @@ for s in 16 32 64 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/MeetLite.icns"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+# 版本号从 config.py 读，避免 plist 与界面显示漂移
+VER=$(grep -m1 'APP_VERSION' config.py | sed -E 's/.*"([0-9.]+)".*/\1/')
+echo "› 版本 $VER"
+
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>CFBundleName</key><string>MeetLite</string>
   <key>CFBundleDisplayName</key><string>MeetLite</string>
   <key>CFBundleIdentifier</key><string>app.meetlite.local</string>
-  <key>CFBundleVersion</key><string>0.1.0</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>${VER}</string>
+  <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundleExecutable</key><string>MeetLite</string>
   <key>CFBundleIconFile</key><string>MeetLite</string>
   <key>CFBundlePackageType</key><string>APPL</string>

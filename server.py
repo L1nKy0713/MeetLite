@@ -490,6 +490,7 @@ class Handler(BaseHTTPRequestHandler):
                     "perm_dismissed": bool(app.cfg.get("perm_dismissed")),
                     "ui_lang": app.cfg.get("ui_lang") or "zh",
                     "asr_lang": app.cfg.get("asr_lang") or "auto",
+                    "close_action": app.cfg.get("close_action") or "ask",
                 })
             if method == "POST":
                 body = self._body()
@@ -503,6 +504,8 @@ class Handler(BaseHTTPRequestHandler):
                     app.cfg["ui_lang"] = body["ui_lang"]
                 if isinstance(body.get("asr_lang"), str) and body["asr_lang"].strip():
                     app.cfg["asr_lang"] = body["asr_lang"].strip().lower()
+                if body.get("close_action") in ("ask", "background", "quit"):
+                    app.cfg["close_action"] = body["close_action"]
                 app.cfg.save()
                 return self._json({"ok": True})
 
