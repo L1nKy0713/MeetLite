@@ -39,3 +39,4 @@ desktop.ini
 windows/MeetLite.Win/bin/
 windows/MeetLite.Win/obj/
 *.pdb
+feedback/digest/weekly.log

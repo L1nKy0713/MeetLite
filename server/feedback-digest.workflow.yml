@@ -1,0 +1,68 @@
+name: feedback-digest
+
+# 每周一 08:00（Asia/Shanghai）拉一次用户反馈，生成 Markdown 周报并提交。
+# GitHub Actions 的 cron 走 UTC：周一 00:00 UTC = 周一 08:00 北京时间。
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: '回看天数（默认 7）'
+        required: false
+        default: '7'
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: feedback-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 计算时间窗口
+        id: win
+        run: |
+          DAYS="${{ github.event.inputs.days || '7' }}"
+          echo "since=$(date -u -d "-${DAYS} days" +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "date=$(TZ=Asia/Shanghai date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: 拉取 label=feedback 的 issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X GET "repos/${{ github.repository }}/issues" \
+            -f state=all -f labels=feedback -f per_page=100 \
+            -f since="${{ steps.win.outputs.since }}" > /tmp/issues.json
+          echo "fetched: $(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/issues.json','utf8')).length)")"
+
+      - name: 生成周报
+        env:
+          DIGEST_SINCE: ${{ steps.win.outputs.since }}
+        run: |
+          mkdir -p feedback/digest
+          node server/feedback-digest.mjs /tmp/issues.json > "feedback/digest/${{ steps.win.outputs.date }}.md"
+          sed -n '1,40p' "feedback/digest/${{ steps.win.outputs.date }}.md"
+
+      - name: 写进 job summary
+        run: cat "feedback/digest/${{ steps.win.outputs.date }}.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 提交
+        run: |
+          git config user.name  "meetlite-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add feedback/digest
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "chore(feedback): 周报 ${{ steps.win.outputs.date }}"
+            git push
+          fi

@@ -163,10 +163,9 @@ python3 tools/feedback-weekly.py --stdout        # 只看不写
 
 挂成每周一 08:00 的定时任务：
 
-- macOS（launchd）：把上面的命令写进 `~/Library/LaunchAgents/ai.meetlite.feedback.plist`
-  的 `ProgramArguments`，`StartCalendarInterval` 用 `{Weekday=1, Hour=8, Minute=0}`，
-  然后 `launchctl load -w ~/Library/LaunchAgents/ai.meetlite.feedback.plist`。
-- Windows（任务计划程序）：`schtasks /create /tn MeetLite反馈周报 /sc weekly /d MON /st 08:00 ^
+- macOS：`bash tools/install-weekly.sh`（写 LaunchAgent `ai.meetlite.feedback`，
+  `Weekday=1 Hour=8`，装完立刻跑一次；`--remove` 卸载）。
+- Windows：`schtasks /create /tn MeetLite反馈周报 /sc weekly /d MON /st 08:00 ^
   /tr "python tools\feedback-weekly.py"`。
 
 ### 用 GitHub Actions 跑（需要 workflow 权限的 token 提交一次）
