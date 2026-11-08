@@ -1,0 +1,7 @@
+name = "meetlite-feedback"
+main = "feedback-worker.js"
+compatibility_date = "2026-01-01"
+
+# 口令与 token 用 wrangler secret put 设置，不要写在这里
+[vars]
+REPO = "L1nKy0713/MeetLite"

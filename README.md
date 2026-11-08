@@ -149,6 +149,33 @@ cd server && wrangler deploy
 然后把 `https://<worker>.workers.dev/f?k=<FEEDBACK_TOKEN>` 填进每个客户端的
 `config.json → feedback_webhook`（或写进打包时的默认 `DEFAULTS`）。
 
+### 本机每周自动拉一次（不需要 Actions 权限）
+
+`tools/feedback-weekly.py` 只用标准库，把最近 7 天的 `label=feedback` issue 折成
+`feedback/digest/<日期>.md`：
+
+```bash
+echo "<你的 GitHub PAT>" > ~/.config/meetlite/gh_token && chmod 600 ~/.config/meetlite/gh_token
+python3 tools/feedback-weekly.py                 # 立刻跑一次
+python3 tools/feedback-weekly.py --days 30       # 换窗口
+python3 tools/feedback-weekly.py --stdout        # 只看不写
+```
+
+挂成每周一 08:00 的定时任务：
+
+- macOS（launchd）：把上面的命令写进 `~/Library/LaunchAgents/ai.meetlite.feedback.plist`
+  的 `ProgramArguments`，`StartCalendarInterval` 用 `{Weekday=1, Hour=8, Minute=0}`，
+  然后 `launchctl load -w ~/Library/LaunchAgents/ai.meetlite.feedback.plist`。
+- Windows（任务计划程序）：`schtasks /create /tn MeetLite反馈周报 /sc weekly /d MON /st 08:00 ^
+  /tr "python tools\feedback-weekly.py"`。
+
+### 用 GitHub Actions 跑（需要 workflow 权限的 token 提交一次）
+
+仓库里的 `.github/workflows/feedback-digest.yml` 是免维护版本（UTC 周一 00:00 = 北京 08:00，
+结果贴在 Actions 的 Summary 页并提交 `feedback/digest/<日期>.md`）。
+注意：用只有 `repo` scope 的 OAuth token 无法通过 API 推送 `.github/workflows/*`（会 404），
+需要在网页端或用带 `workflow` scope 的 token 提交一次。
+
 ### 每周一 08:00 自动汇总
 
 `.github/workflows/feedback-digest.yml` 用 GitHub Actions 定时跑（UTC 周一 00:00 = 北京周一 08:00）：
