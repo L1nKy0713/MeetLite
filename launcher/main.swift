@@ -272,6 +272,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         a.addButton(withTitle: "好"); a.runModal(); completionHandler()
     }
 
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        let a = NSAlert(); a.messageText = "MeetLite"; a.informativeText = message
+        a.addButton(withTitle: "确定"); a.addButton(withTitle: "取消")
+        completionHandler(a.runModal() == .alertFirstButtonReturn)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        let a = NSAlert(); a.messageText = "MeetLite"; a.informativeText = prompt
+        let f = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        f.stringValue = defaultText ?? ""
+        a.accessoryView = f
+        a.addButton(withTitle: "确定"); a.addButton(withTitle: "取消")
+        completionHandler(a.runModal() == .alertFirstButtonReturn ? f.stringValue : nil)
+    }
+
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
         let panel = NSOpenPanel()

@@ -1,11 +1,11 @@
 {
-  "version": "1.1.0",
+  "version": "1.1.1",
   "published": "2026-11-08",
-  "notes": "1.1.0：新增「问题反馈」——设置里可直接提交问题/建议，附带脱敏环境信息（版本、系统、模型名、最近日志，不含会议内容），支持 webhook 直发、本地归档与 GitHub 预填三种通道；仓库侧提供每周一 08:00 自动汇总的 Actions 工作流与 Cloudflare Worker 接收端。",
+  "notes": "1.1.1：修好侧边栏删除键——旧版在 .app 里点 ✕ 毫无反应（原生 confirm 未被实现，弹窗静默返回取消）。现在改用应用内自绘确认框，删除、重命名等提示也不再依赖系统对话框；所有 alert 提示改为应用内轻提示。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.0/MeetLite-1.1.0.zip",
-    "size": 1080741,
-    "sha256": "4ed0aaefe8180f9cd699ae8af9a9d593108ecb90c678c467935a31cce56c38e6"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.1/MeetLite-1.1.1.zip",
+    "size": 1082795,
+    "sha256": "e990129da022395484d73e0e34436bc8bcc575f2d168ccdbb48eb6be4c3024b7"
   },
   "windows": {
     "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.0/MeetLite-1.1.0-win.zip",
