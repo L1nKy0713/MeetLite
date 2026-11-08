@@ -1,1 +1,16 @@
-ewogICJ2ZXJzaW9uIjogIjEuMi4wIiwKICAicHVibGlzaGVkIjogIjIwMjYtMTEtMDgiLAogICJub3RlcyI6ICIxLjIuMO+8muaWsOWinuWbnuaUtuermeOAguWIoOmZpOS8muiuruS4jeWGjeebtOaOpemUgOavgeKAlOKAlOWFiOiQveS4gOS7vSBKU09OIOW/q+eFp+WIsCB0cmFzaCDnm67lvZXvvIzpu5jorqTkv53nlZkgNyDlpKnlkI7oh6rliqjmuIXnkIbvvJvliKDpmaTnnqzpl7Tlj7PkuIvop5LmnInjgIzmkqTplIDjgI3vvIw2IOenkuWGheWPr+WOn+agt+aBouWkjeOAguiuvue9rumHjOWPr+aJk+W8gOWbnuaUtuerme+8jOmaj+aXtuaBouWkjSAvIOW9u+W6leWIoOmZpCAvIOa4heepuu+8jOS/neeVmeWkqeaVsOS4juW8gOWFs+mDveWPr+WcqCBjb25maWcuanNvbiDosIPmlbTjgILovazlhpnjgIHnuqropoHjgIHnrJTorrDkvJrkuIDotbfov5vlm57mlLbnq5nkuIDotbflm57mnaXjgIJcblxuV2luZG93czogTWVldExpdGUtMS4yLjAtd2luLnppcO+8iOmmluasoeWQr+WKqOaMieaPkOekuuS4i+i9veaooeWei++8iSIsCiAgIm1hY29zIjogewogICAgInVybCI6ICJodHRwczovL2dpdGh1Yi5jb20vTDFuS3kwNzEzL01lZXRMaXRlL3JlbGVhc2VzL2Rvd25sb2FkL3YxLjIuMC9NZWV0TGl0ZS0xLjIuMC56aXAiLAogICAgInNpemUiOiAxMDg4NjUxLAogICAgInNoYTI1NiI6ICI0NjkyYjkyNDBiMDkxNDI2OTkzYmZjM2Y2OWU5NmU0YTdhNDgxZTU0MGQyNTQ3M2I3YTJkMjQ0OGIxZjRhZmMwIgogIH0sCiAgIndpbmRvd3MiOiB7CiAgICAidXJsIjogImh0dHBzOi8vZ2l0aHViLmNvbS9MMW5LeTA3MTMvTWVldExpdGUvcmVsZWFzZXMvZG93bmxvYWQvdjEuMi4wL01lZXRMaXRlLTEuMi4wLXdpbi56aXAiLAogICAgInNpemUiOiAyNDI0MTM1MCwKICAgICJzaGEyNTYiOiAiMjg4MWQ5YWY3ZjFhZDM1NmU2ZjRmM2RkZmE5NWFmNjY0NzM1YzAxOWY4MzI3YWYwODMwYTU3N2NlNTNjY2FjMiIsCiAgICAidmVyc2lvbiI6ICIxLjIuMCIKICB9Cn0K
+{
+  "version": "1.2.0",
+  "published": "2026-11-08",
+  "notes": "1.2.0：新增回收站。删除会议不再直接销毁——先落一份 JSON 快照到 trash 目录，默认保留 7 天后自动清理；删除瞬间右下角有「撤销」，6 秒内可原样恢复。设置里可打开回收站，随时恢复 / 彻底删除 / 清空，保留天数与开关都可在 config.json 调整。转写、纪要、笔记会一起进回收站一起回来。\n\nWindows: MeetLite-1.2.0-win.zip（首次启动按提示下载模型）",
+  "macos": {
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.2.0/MeetLite-1.2.0.zip",
+    "size": 1088651,
+    "sha256": "4692b9240b091426993bfc3f69e96e4a7a481e540d25473b7a2d2448b1f4afc0"
+  },
+  "windows": {
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.2.0/MeetLite-1.2.0-win.zip",
+    "size": 24241350,
+    "sha256": "2881d9af7f1ad356e6f4f3ddfa95af664735c019f8327af0830a577ce53ccac2",
+    "version": "1.2.0"
+  }
+}
