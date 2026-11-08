@@ -1,15 +1,15 @@
 {
-  "version": "1.3.3",
+  "version": "1.4.0",
   "published": "2026-11-08",
-  "notes": "1.3.3：模型面板里 Qwen 那一行的说明改回「只讲模型本身」（量化档位、能不能纯 CPU 跑、体积），安装方式统一放到下方的下载/导入区，不再混在模型简介里。\n\nWindows: MeetLite-1.3.3-win.zip（首次启动按提示下载模型）",
+  "notes": "1.4.0：按 Windows 1.3.1 实机反馈修了一整条启动链。\n\n· 首次启动不再直接退出：没有模型时照常起服务，界面里的「先准备两个本地模型」向导能正常打开（之前是黑窗一闪就没了）。\n· Windows 绿色包自带运行时找不到 app 目录的问题已修（_pth 缺一行，导致 ModuleNotFoundError: audiodec）。\n· 外壳启动失败「已添加项…HTTPS_PROXY/https_proxy」已修（改用 -X utf8，不再动进程环境变量）。\n· 双击没反应已修（Shell.cs 里补了 _win.Show()；之前主窗口压根没建出来，只剩托盘）。\n· 外壳编译错误 CS0103 BeginInvoke 已修，外壳源码现在能编过。\n· 记日志/请求处理：POST 没读请求体会污染 keep-alive 连接（日志里的 Bad request syntax），已修。\n· 采集源下拉框首次打开是空的，已改成首屏同步探测设备。\n· 高分屏 125%/150% 缩放下窗口偏小、右上角下拉被裁，已改用 Dpi 自动缩放并按屏幕可用区域限制尺寸。\n\nWindows 包：本版改为双击「启动.bat」（或 start.bat）运行，用系统浏览器打开界面，功能与原生窗口一致；原生窗口壳需要自带 VS 编译（源码在仓库 windows/），编译好的 MeetLite.exe 放进同目录会被自动优先使用。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.3/MeetLite-1.3.3.zip",
-    "size": 1124549,
-    "sha256": "1b89f94a564a0e6ff603928b1273afcba0f2c23b6b1fd62f346b422f113be514"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.0/MeetLite-1.4.0.zip",
+    "size": 1125988,
+    "sha256": "e91dc5a2852e23dab115d77eaf18ead02b48d94f240d48556deacba23df615a6"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.3/MeetLite-1.3.3-win.zip",
-    "size": 24242611,
-    "sha256": "7f6606657318a83112c7e89e21337257e0251432db3064e6e690f5b483cead2d"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.0/MeetLite-1.4.0-win.zip",
+    "size": 24172906,
+    "sha256": "2123a6fae2ba77acd5d00c2dee587f8b791b6ed62845232ca7929d5f98d8e805"
   }
 }

@@ -152,7 +152,10 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 section.stage{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 #export{flex:0 0 auto;white-space:nowrap;}
 .recbar #status{flex:0 1 150px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-.recbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:nowrap;white-space:nowrap}
+.recbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:nowrap;white-space:nowrap;overflow-x:auto;scrollbar-width:thin}
+/* 窗口窄时先让下拉框和标题缩，缩到底再横向滚动：不然右边的「导出 Markdown」会被裁掉 */
+.recbar>select{flex:0 1 150px;min-width:96px;text-overflow:ellipsis}
+.recbar>button{flex:0 0 auto}
 #title{flex:0 1 200px;min-width:110px;font-weight:620;font-size:15px;border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:8px;max-width:32vw}
 #title:hover{border-color:var(--line)}
 #title:focus{background:var(--field-focus);border-color:var(--accent);outline:none}

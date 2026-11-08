@@ -19,6 +19,12 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+# embeddable Python 带 *_pth 时是隔离模式，脚本所在目录不会自动进 sys.path
+# （Windows 包里靠 build-win.ps1 往 _pth 补 ..\app，这里再加一道，免得换了打包方式又踩）。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
 import audiodec
 import config as config_mod
 import feedback as feedback_mod
@@ -146,11 +152,26 @@ class App:
         return self._perm_ok
 
     def devices(self):
-        """设备列表：缓存 60s，后台刷新，不阻塞请求。"""
+        """设备列表：缓存 60s，后台刷新，不阻塞请求。
+
+        首次调用例外：同步探测一次（loopcap --list / ffmpeg 列设备都是毫秒级），
+        否则首屏拿到的永远是空数组，采集源下拉框会是空的。
+        """
         import time as _t
         now = _t.time()
         if self._devices and now - self._devices_at < 60:
             return self._devices
+        if not self._devices and not self._devices_busy:
+            self._devices_busy = True
+            try:
+                self._devices = list_input_devices(self.cfg.get("ffmpeg", "ffmpeg"))
+            except Exception:
+                pass
+            finally:
+                self._devices_at = _t.time()
+                self._devices_busy = False
+            if self._devices:
+                return self._devices
         if not self._devices_busy:
             self._devices_busy = True
 
@@ -351,19 +372,36 @@ class Handler(BaseHTTPRequestHandler):
     def _err(self, msg, code=400):
         self._json({"ok": False, "error": str(msg)}, code)
 
-    def _body(self) -> dict:
-        n = int(self.headers.get("Content-Length") or 0)
-        if not n:
-            return {}
-        raw = self.rfile.read(n)
+    def _read_body_once(self):
+        """入口处读一次请求体并缓存。
+
+        不读的话，body 会留在 socket 缓冲区，被 BaseHTTPRequestHandler 当成
+        下一条请求行解析（日志里那句 code 400, message Bad request syntax ('{}')），
+        keep-alive 连接就此报废。
+
+        注意：HTTP/1.1 keep-alive 时同一个 handler 实例会连着处理多条请求，
+        所以不能靠「已经读过就跳过」——那样第二条请求的 body 就没被读走。
+        每次都按当前 Content-Length 重新读。
+        """
         try:
-            return json.loads(raw.decode("utf-8"))
-        except Exception:
-            return {}
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        self._body_raw = self.rfile.read(n) if n > 0 else b""
 
     def _raw_body(self) -> bytes:
-        n = int(self.headers.get("Content-Length") or 0)
-        return self.rfile.read(n) if n else b""
+        # 已经在 do_* 入口读过了；这里只能取缓存，再 read 一次会卡在 socket 上
+        return getattr(self, "_body_raw", b"")
+
+    def _body(self) -> dict:
+        raw = self._raw_body()
+        if not raw:
+            return {}
+        try:
+            out = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return {}
+        return out if isinstance(out, dict) else {}
 
     def log_message(self, fmt, *args):
         if self.path.startswith("/api/events"):
@@ -372,15 +410,19 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- 路由 ----
     def do_GET(self):
+        self._read_body_once()          # GET 一般不带宽体，但宽体不读干净一样会污染下一条
         self._route("GET")
 
     def do_POST(self):
+        self._read_body_once()          # 先把 body 读干净，避免污染 keep-alive
         self._route("POST")
 
     def do_PATCH(self):
+        self._read_body_once()
         self._route("PATCH")
 
     def do_DELETE(self):
+        self._read_body_once()
         self._route("DELETE")
 
     def _route(self, method):
@@ -792,13 +834,6 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=run, daemon=True).start()
         return self._json({"ok": True, "status": "started"})
 
-    def _raw_body(self) -> bytes:
-        try:
-            n = int(self.headers.get("Content-Length") or 0)
-        except ValueError:
-            n = 0
-        return self.rfile.read(n) if n else b""
-
     def _summarize_async(self, mid, tpl):
         app = APP
         if app.busy["summarize"]:
@@ -888,33 +923,59 @@ def main():
     ap.add_argument("--port", type=int, default=None)
     ap.add_argument("--no-warm", action="store_true", help="不预热模型")
     ap.add_argument("--source", default=None, help="默认采集源 mic|system|mix")
+    ap.add_argument("--open", action="store_true", help="启动后自动用默认浏览器打开界面")
     args = ap.parse_args()
 
     cfg = config_mod.load()
-    port = args.port or int(cfg.get("port", 8787))
+    # --port 0 = 让系统分配空闲端口，所以不能用 `or` 兜底（0 是 falsy）
+    port = args.port if args.port is not None else int(cfg.get("port", 8787))
     try:
         updater.cleanup()          # 清掉上次更新留下的 .old / 脚本 / 解包目录
     except Exception:
         pass
 
+    # 缺模型不再退出：Windows 包首次运行 100% 没有模型，界面上的「先准备两个本地模型」
+    # 向导必须能渲染出来。这里只提示，预热线程失败也不影响起服务。
     if not cfg.get("whisper_model"):
-        print("找不到 whisper 模型：请到「设置 → 模型」下载或导入，或在 config.json 指定 whisper_model")
-        sys.exit(1)
+        print("尚未配置 whisper 模型：可在界面里下载，或在 config.json 指定 whisper_model")
     if not cfg.get("summary_model"):
-        print("找不到摘要模型（.gguf）")
-        sys.exit(1)
+        print("尚未配置摘要模型（.gguf）：可在界面里下载，或在 config.json 指定 summary_model")
     if not cfg.get("llama_server"):
         print("找不到 llama-server：macOS 用 brew install llama.cpp，或把可执行文件放进 bin/ 目录")
 
     global APP
     APP = App(cfg)
 
+    def _name(v):
+        return os.path.basename(str(v)) if v else "未配置"
+
+    # 先建 socket 再打 banner：--port 0 时真实端口由系统分配，得从 server_address 取
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError as e:
+        print(f"端口 {port} 起不来：{e}")
+        print("可以换一个端口试试：python server.py --port 0")
+        raise SystemExit(1)
+    srv.daemon_threads = True
+    port = srv.server_address[1]
+    url = f"http://127.0.0.1:{port}"
+
     print("=" * 62)
     print(" MeetLite")
-    print(f" 转写  localWhisper / {os.path.basename(cfg.get('whisper_model'))}")
-    print(f" 摘要  builtin-ai  / {os.path.basename(cfg.get('summary_model'))}")
-    print(f" 界面  http://127.0.0.1:{port}")
+    print(f" 转写  localWhisper / {_name(cfg.get('whisper_model'))}")
+    print(f" 摘要  builtin-ai  / {_name(cfg.get('summary_model'))}")
+    print(f" 界面  {url}")
     print("=" * 62)
+
+    if args.open:
+        def _open_browser():
+            time.sleep(0.5)
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception:
+                pass
+        threading.Thread(target=_open_browser, daemon=True).start()
 
     if not args.no_warm:
         threading.Thread(target=_warm, args=(APP,), daemon=True).start()
@@ -937,8 +998,6 @@ def main():
 
     threading.Thread(target=_watch_parent, daemon=True).start()
 
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    srv.daemon_threads = True
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

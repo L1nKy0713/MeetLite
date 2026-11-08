@@ -44,18 +44,25 @@ if (-not (Test-Path $PyZip)) {
     Invoke-WebRequest 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip' -OutFile $PyZip
 }
 Expand-Archive $PyZip -DestinationPath $Stage\runtime -Force
-# embeddable 的 _pth 默认不把当前目录加进 sys.path，我们要它——补一行 "."
+# embeddable 发行版一旦带 python*._pth 就进入隔离模式：sys.path 完全由这个文件决定，
+# 命令行 cwd、脚本所在目录都不会自动加入。而且 _pth 里的相对路径是相对 _pth 自己所在的
+# runtime\ 解析的，所以 "." 等于 runtime\，不是 app\。后端模块都在 app\，必须显式写 "..\app"，
+# 否则 server.py 一 import audiodec 就是 ModuleNotFoundError、进程秒退（P0）。
 Get-ChildItem "$Stage\runtime\python*._pth" | ForEach-Object {
     $c = Get-Content $_.FullName
-    if ($c -notcontains '.') { Add-Content $_.FullName '.' }
+    if ($c -notcontains '.')     { Add-Content $_.FullName '.' }
+    if ($c -notcontains '..\app') { Add-Content $_.FullName '..\app' }
+    Write-Host "      _pth: $($_.Name) -> $((Get-Content $_.FullName) -join ' ')"
 }
 
 # ---------------------------------------------------------------- 3. 后端与界面
 Write-Host "[3/6] 拷贝后端"
+# 注意：不要把仓库根的 update.json 拷进包 —— 它的 size/sha256 要等 zip 打完才知道，
+# 拷进去必然慢一个版本，而运行时根本不读它（updater.py 只认 config.update_url 的远端清单）。
 $files = @('server.py','capture.py','config.py','llm.py','model_manager.py','models.json',
            'platforms.py','store.py','summarize.py','updater.py','whisper_engine.py',
-           'feedback.py','audiodec.py',
-           'update.json','README.md','THIRD_PARTY.md','LICENSE')
+           'feedback.py','audiodec.py','trash.py','启动.bat',
+           'README.md','THIRD_PARTY.md','LICENSE')
 foreach ($f in $files) {
     if (Test-Path $f) { Copy-Item $f "$Stage\app\" -Force }
 }
@@ -165,6 +172,46 @@ MeetLite $Version（绿色版）
   播报类应用（Teams/腾讯会议/浏览器）保持正常音量即可，loopcap 走 WASAPI loopback，
   不需要装虚拟声卡，也不需要管理员权限。
 "@ | Set-Content "$Stage\使用说明.txt" -Encoding UTF8
+
+# ---------------------------------------------------------------- 5.5 冒烟自检
+# 这四个 P0（_pth、缺模型 sys.exit、Environment 大小写、Shown 死锁）都属于
+# "构建成功但运行必挂"，编译通过不代表能跑，必须真起一次。
+Write-Host "[5.5/6] 冒烟自检"
+$PyExe = "$Stage\runtime\python.exe"
+if (-not (Test-Path $PyExe)) { throw "缺 runtime\python.exe" }
+
+Write-Host "      1) 后端模块能否 import"
+& $PyExe -c "import sys; sys.path.insert(0,'app'); import config, store, platforms, audiodec; print('      ok', config.APP_VERSION)"
+if ($LASTEXITCODE -ne 0) { throw "后端 import 失败（多半是 _pth 没补 ..\app）" }
+
+Write-Host "      2) 无模型状态下能否起服务（首启就是没有模型）"
+$smokePort = 18787
+$env:MEETLITE_SMOKE = '1'
+$sm = Start-Process $PyExe -ArgumentList '-X','utf8','-u','server.py','--port',"$smokePort" -WorkingDirectory "$Stage\app" -PassThru -WindowStyle Hidden
+$okSmoke = $false
+for ($i = 0; $i -lt 20; $i++) {
+    Start-Sleep -Milliseconds 500
+    try {
+        $r = Invoke-RestMethod "http://127.0.0.1:$smokePort/api/system" -TimeoutSec 3
+        if ($r.ok) { $okSmoke = $true; break }
+    } catch { }
+}
+if (-not $sm.HasExited) { Stop-Process $sm -Force }
+if (-not $okSmoke) { throw "后端在无模型状态下没能起服务（检查 server.py 里是否还有 sys.exit）" }
+Write-Host "      ok 无模型也能起，models_ready=$($r.models_ready)"
+
+Write-Host "      3) 外壳能否拉起可见窗口（15s）"
+$shell = Start-Process "$Stage\MeetLite.exe" -PassThru
+$okWin = $false
+for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Milliseconds 500
+    $shell.Refresh()
+    if ($shell.HasExited) { break }
+    if ($shell.MainWindowHandle -ne [IntPtr]::Zero -and $shell.MainWindowTitle) { $okWin = $true; break }
+}
+if (-not $shell.HasExited) { Stop-Process $shell -Force }
+if (-not $okWin) { throw "外壳没有出现可见窗口（Shown 死锁 / Environment 异常，看 %APPDATA%\MeetLite\server.log）" }
+Write-Host "      ok 窗口已出现"
 
 # ---------------------------------------------------------------- 6. 打包
 Write-Host "[6/6] 打包 zip"

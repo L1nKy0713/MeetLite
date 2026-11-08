@@ -54,8 +54,13 @@ internal sealed class Shell : ApplicationContext
         Directory.CreateDirectory(_dataDir);
 
         _win.Text = "MeetLite";
-        _win.Width = 1220;
-        _win.Height = 800;
+        // AutoScaleMode.Font 会按设计期字体比例整体缩放（100% 缩放的机器上实测变成
+        // 976x640，右上角"麦克风"下拉被裁掉一截）。改用 Dpi，并按工作区尺寸 clamp。
+        _win.AutoScaleMode = AutoScaleMode.Dpi;
+        var wa = Screen.PrimaryScreen.WorkingArea;
+        _win.ClientSize = new Size(
+            Math.Min(1220, Math.Max(880, wa.Width - 120)),
+            Math.Min(800, Math.Max(540, wa.Height - 100)));
         _win.MinimumSize = new Size(880, 540);
         _win.StartPosition = FormStartPosition.CenterScreen;
         _win.BackColor = Color.FromArgb(247, 246, 243);
@@ -88,6 +93,9 @@ internal sealed class Shell : ApplicationContext
         _tray.DoubleClick += (_, _) => ShowWindow();
 
         _win.Shown += async (_, _) => await InitWebView();
+        // 必须先 Show 一次：Shown 不触发 -> InitWebView 不执行 -> _webReady 永远 false
+        // -> TryShowUI 直接 return -> 主窗体连 HWND 都不建，只剩托盘图标（"双击没反应"）。
+        _win.Show();
         _ = Boot();
     }
 
@@ -213,9 +221,11 @@ internal sealed class Shell : ApplicationContext
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
             };
-            psi.Arguments = $"-u server.py --port {_port}";
-            psi.Environment["PYTHONIOENCODING"] = "utf-8";
-            psi.Environment["PYTHONUTF8"] = "1";
+            // 不写 psi.Environment[key]：.NET Framework 的 ProcessStartInfo.Environment 是
+            // 大小写不敏感的 StringDictionary，父进程若同时存在 HTTPS_PROXY / https_proxy
+            // （Clash、v2rayN、Git Bash 都会这么设），初始化直接抛 "已添加项" 整窗失败。
+            // -X utf8 等价于 PYTHONUTF8/PYTHONIOENCODING，另加 _pth 里已补 ..\app。
+            psi.Arguments = $"-X utf8 -u server.py --port {_port}";
 
             _server = new Process { StartInfo = psi, EnableRaisingEvents = true };
             _server.OutputDataReceived += (_, e) => Append(e.Data);
@@ -334,7 +344,7 @@ internal sealed class Shell : ApplicationContext
             var json = e.WebMessageAsJson ?? "";
             if (json.IndexOf("winclose", StringComparison.Ordinal) < 0) return;
             if (json.IndexOf("background", StringComparison.Ordinal) >= 0) { HideToTray(); return; }
-            if (json.IndexOf("quit", StringComparison.Ordinal) >= 0) { _exiting = true; BeginInvoke(new Action(Quit)); }
+            if (json.IndexOf("quit", StringComparison.Ordinal) >= 0) { _exiting = true; _win.BeginInvoke(new Action(Quit)); }
         }
         catch { }
     }
@@ -347,7 +357,7 @@ internal sealed class Shell : ApplicationContext
         if (act == "quit")
         {
             _exiting = true;
-            BeginInvoke(new Action(Quit));
+            _win.BeginInvoke(new Action(Quit));
             return;
         }
         if (act == "background") { HideToTray(); return; }
