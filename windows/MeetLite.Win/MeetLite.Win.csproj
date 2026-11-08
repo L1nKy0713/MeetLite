@@ -10,6 +10,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MeetLite</AssemblyName>
     <RootNamespace>MeetLite.Win</RootNamespace>
+    <!-- 版本号：与 config.py 的 APP_VERSION 保持一致，改版时一起改 -->
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <InformationalVersion>1.2.0</InformationalVersion>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationDefaultFont>Microsoft YaHei UI, 9pt</ApplicationDefaultFont>
     <ApplicationIcon>meetlite.ico</ApplicationIcon>
