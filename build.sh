@@ -11,7 +11,7 @@ swiftc -O -framework AppKit -framework WebKit -o "$APP/Contents/MacOS/MeetLite" 
 
 echo "› 复制运行时"
 cp -R server.py config.py store.py capture.py whisper_engine.py llm.py summarize.py \
-      platforms.py model_manager.py models.json updater.py audiodec.py feedback.py \
+      platforms.py model_manager.py models.json updater.py audiodec.py feedback.py trash.py \
       static templates bin "$APP/Contents/Resources/app/"
 find "$APP/Contents/Resources/app" -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
 

@@ -221,7 +221,9 @@ brew install whisper-cpp ffmpeg   # whisper-server 转写服务、ffmpeg 采集�
 
 - 数据库：`~/Library/Application Support/MeetLite/meetlite.sqlite`（表 meetings / segments / summaries / notes）
 - 日志：`~/Library/Logs/MeetLite/server.log`
-- 删除某次会议：左栏悬停该条，点右上 `✕`（会一并删掉转写与纪要）。
+- 删除某次会议：左栏悬停该条，点右上 `✕` → 会议先进回收站，右下角提示「已移到回收站 · 撤销」，6 秒内点「撤销」可原样恢复。
+- 回收站：`~/Library/Application Support/MeetLite/trash/*.json`（一条会议一个 JSON 快照，含转写、纪要、笔记，几 KB）。默认保留 7 天，过期在启动时与每小时自动清理；也可以随时在「设置 → 回收站」里恢复 / 彻底删除 / 清空。
+- 关掉回收站功能：`config.json` 里 `"trash_enabled": false`（删除即彻底删）；改保留天数：`"trash_days": 3`（1–365）。
 - 退出应用会连带结束 `whisper-server` / `llama-server`；异常退出时服务会在 2 秒内自检父进程并退出，不留孤儿进程。
 
 ## 开发模式（不开窗口，浏览器访问）

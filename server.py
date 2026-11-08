@@ -27,6 +27,7 @@ import store as store_mod
 import model_manager
 import updater
 import summarize as summarize_mod
+import trash as trash_mod
 from capture import Recorder, list_input_devices, system_audio_allowed
 from llm import LocalLLM
 from whisper_engine import WhisperEngine
@@ -67,6 +68,16 @@ class App:
         self._devices_at = 0.0
         self._devices_busy = False
 
+        # ---- 回收站 ----
+        self._trash_seen = 0.0
+        try:
+            n = len(trash_mod.auto_purge(self.trash_days()))
+            if n:
+                self.log(f"回收站：清理了 {n} 条过期记录")
+        except Exception as e:
+            self.log(f"回收站清理失败：{e}")
+        threading.Thread(target=self._trash_tick, daemon=True).start()
+
         self.jobs: queue.Queue = queue.Queue()
         self.worker = threading.Thread(target=self._transcribe_loop, daemon=True)
         self.worker.start()
@@ -84,6 +95,35 @@ class App:
         self.busy = {"summarize": False, "import": False}
         self.last_text: dict[str, str] = {}   # meeting_id -> 最近一段，用作 initial_prompt
         self.last_error: str | None = None
+
+    # ---------------- 回收站 ----------------
+    def trash_enabled(self) -> bool:
+        v = self.cfg.get("trash_enabled")
+        return True if v is None else bool(v)
+
+    def trash_days(self) -> int:
+        try:
+            d = int(self.cfg.get("trash_days") or 7)
+        except (TypeError, ValueError):
+            d = 7
+        return max(1, min(d, 365))
+
+    def trash_move(self, mid: str) -> dict:
+        r = trash_mod.move_to_trash(self.store, mid)
+        if r.get("ok"):
+            self.log(f"回收站：{r.get('title')} → {r.get('entry')}")
+        return r
+
+    def _trash_tick(self):
+        """每小时清一次过期项（App 长期开着也不会堆着）。"""
+        while True:
+            time.sleep(3600)
+            try:
+                n = len(trash_mod.auto_purge(self.trash_days()))
+                if n:
+                    self.log(f"回收站：清理了 {n} 条过期记录")
+            except Exception:
+                pass
 
     def system_audio_ok(self):
         """不阻塞：探测在后台线程做，先返回缓存值（未知返回 None）。"""
@@ -580,6 +620,13 @@ class Handler(BaseHTTPRequestHandler):
             if method == "DELETE":
                 if app.recorder and app.rec_meeting == mid:
                     return self._err("正在录音，先停止录音", 409)
+                if app.trash_enabled():
+                    r = app.trash_move(mid)
+                    if not r.get("ok"):
+                        return self._err(r.get("error") or "删除失败", 404)
+                    return self._json({"ok": True, "trash": r.get("entry"),
+                                       "title": r.get("title"),
+                                       "days": app.trash_days()})
                 app.store.delete_meeting(mid)
                 return self._json({"ok": True})
             if method == "PATCH":
@@ -590,11 +637,33 @@ class Handler(BaseHTTPRequestHandler):
                 if "notes" in b:
                     app.store.save_notes(mid, b["notes"])
                 return self._json({"ok": True, "meeting": app.store.get_meeting(mid)})
+
+        # ---- 回收站 ----
+        if p == "/api/trash":
+            if method == "GET":
+                return self._json({"ok": True, "items": trash_mod.list_items(app.trash_days()),
+                                   "days": app.trash_days(),
+                                   "enabled": app.trash_enabled()})
             if method == "DELETE":
-                if app.rec_meeting == mid:
-                    return self._err("正在录音，先停止")
-                app.store.delete_meeting(mid)
-                return self._json({"ok": True})
+                return self._json(trash_mod.empty())
+
+        m = re.fullmatch(r"/api/trash/([^/]+)", p)
+        if m:
+            name = m.group(1)
+            if method == "DELETE":
+                return self._json(trash_mod.purge(name))
+            if method == "GET":
+                d = trash_mod.get_item(name)
+                if not d:
+                    return self._err("回收站里没有这一项", 404)
+                return self._json({"ok": True, "item": d})
+
+        m = re.fullmatch(r"/api/trash/([^/]+)/restore", p)
+        if m and method == "POST":
+            r = trash_mod.restore(app.store, m.group(1))
+            if r.get("ok"):
+                app.log(f"回收站：恢复会议 {r.get('meeting_id')}")
+            return self._json(r) if r.get("ok") else self._err(r.get("error") or "恢复失败", 404)
 
         # ---- 录音控制 ----
         if p == "/api/record/start" and method == "POST":

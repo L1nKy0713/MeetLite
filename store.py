@@ -94,6 +94,62 @@ class Store:
                 self._conn.execute(f"DELETE FROM {t} WHERE {'id' if t == 'meetings' else 'meeting_id'}=?", (mid,))
             self._conn.commit()
 
+    # ---------------- 快照（回收站用） ----------------
+    def snapshot(self, mid: str) -> dict | None:
+        """把一条会议的全部数据导成纯 dict，供回收站落盘。"""
+        mt = self.get_meeting(mid)
+        if not mt:
+            return None
+        return {
+            "meeting": mt,
+            "segments": self.segments(mid),
+            "summary": self.get_summary(mid),
+            "notes": self.get_notes(mid),
+        }
+
+    def restore_snapshot(self, snap: dict) -> str | None:
+        """把快照写回库。原 id 已被占用时分配新 id。返回最终 id。"""
+        if not isinstance(snap, dict):
+            return None
+        mt = snap.get("meeting") or {}
+        if not mt.get("title"):
+            return None
+        mid = str(mt.get("id") or "").strip()
+        if not mid or self.get_meeting(mid):
+            mid = uuid.uuid4().hex[:12]
+        now = time.time()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO meetings(id,title,created_at,updated_at,duration_ms,status,meta)"
+                " VALUES(?,?,?,?,?,?,?)",
+                (mid, mt.get("title") or "(无标题)",
+                 float(mt.get("created_at") or now), float(mt.get("updated_at") or now),
+                 int(mt.get("duration_ms") or 0), mt.get("status") or "done", mt.get("meta")),
+            )
+            for s in snap.get("segments") or []:
+                self._conn.execute(
+                    "INSERT INTO segments(meeting_id,start_ms,end_ms,text,lang,created_at)"
+                    " VALUES(?,?,?,?,?,?)",
+                    (mid, int(s.get("start_ms") or 0), int(s.get("end_ms") or 0),
+                     s.get("text") or "", s.get("lang"), float(s.get("created_at") or now)),
+                )
+            sm = snap.get("summary") or {}
+            if sm.get("content"):
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO summaries(meeting_id,template,content,created_at)"
+                    " VALUES(?,?,?,?)",
+                    (mid, sm.get("template") or "standard_meeting", sm["content"],
+                     float(sm.get("created_at") or now)),
+                )
+            notes = snap.get("notes")
+            if notes:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO notes(meeting_id,content,updated_at) VALUES(?,?,?)",
+                    (mid, notes, now),
+                )
+            self._conn.commit()
+        return mid
+
     # ---------------- segments ----------------
     def add_segment(self, mid: str, start_ms: int, end_ms: int, text: str, lang: str | None) -> dict:
         now = time.time()

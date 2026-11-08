@@ -1,11 +1,11 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "published": "2026-11-08",
-  "notes": "1.1.1：修好侧边栏删除键——旧版在 .app 里点 ✕ 毫无反应（原生 confirm 未被实现，弹窗静默返回取消）。现在改用应用内自绘确认框，删除、重命名等提示也不再依赖系统对话框；所有 alert 提示改为应用内轻提示。",
+  "notes": "1.2.0：新增回收站。删除会议不再直接销毁——先落一份 JSON 快照到 trash 目录，默认保留 7 天后自动清理；删除瞬间右下角有「撤销」，6 秒内可原样恢复。设置里可打开回收站，随时恢复 / 彻底删除 / 清空，保留天数与开关都可在 config.json 调整。转写、纪要、笔记会一起进回收站一起回来。",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.1/MeetLite-1.1.1.zip",
-    "size": 1082795,
-    "sha256": "e990129da022395484d73e0e34436bc8bcc575f2d168ccdbb48eb6be4c3024b7"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.2.0/MeetLite-1.2.0.zip",
+    "size": 1088651,
+    "sha256": "4692b9240b091426993bfc3f69e96e4a7a481e540d25473b7a2d2448b1f4afc0"
   },
   "windows": {
     "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.1.0/MeetLite-1.1.0-win.zip",

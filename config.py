@@ -8,7 +8,7 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.2.0"
 DATA_DIR = platforms.data_dir()
 MEETILY_DATA = (platforms.meetily_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()
@@ -45,6 +45,8 @@ DEFAULTS = {
     "update_url": "https://fastly.jsdelivr.net/gh/L1nKy0713/MeetLite@main/update.json",
     "update_check": True,
     "feedback_webhook": "",   # 留空=本地归档 + GitHub 预填；填 Worker 地址则直接上报
+    "trash_enabled": True,    # 删除的会议先进回收站
+    "trash_days": 7,          # 回收站保留天数，过期自动清理
     "asr_prompt_en": (
         "This is a meeting recording about product reviews, canary releases, "
         "speech transcription, VAD, speaker diarization, standups, meeting minutes, "

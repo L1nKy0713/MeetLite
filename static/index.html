@@ -129,6 +129,15 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);max-width:min(460px,88vw);padding:9px 14px;border-radius:10px;background:rgba(28,30,34,.94);color:#fff;font-size:12.5px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;z-index:200}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.err{background:rgba(140,32,32,.96)}
+#toast.act{pointer-events:auto}
+#toast .undo{margin-left:10px;padding:2px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.45);background:transparent;color:#fff;font-size:12px;cursor:pointer}
+#toast .undo:hover{background:rgba(255,255,255,.14)}
+.titem{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.titem .ti{flex:1;min-width:0}
+.titem .ti b{display:block;font-size:13px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.titem .ti span{display:block;font-size:11.5px;color:var(--dim);line-height:1.45}
+.titem .tacts{display:flex;gap:6px;flex:0 0 auto}
+.tempty{padding:18px 4px;text-align:center;font-size:12.5px;color:var(--dim);line-height:1.6}
 .fb-status{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dim);word-break:break-word}
 .fb-status.ok{color:var(--green)}
 .fb-status.warn{color:var(--red)}
@@ -294,6 +303,14 @@ const I18N = {
     language_desc: '界面语言，只影响按钮与提示文字。',
     asr_lang_desc: '语音识别使用的语言。选「自动识别」会自己判断，会议里混说中英文时最稳。',
     models: '模型', models_desc: '转写与纪要使用的本地模型文件。', model_manage: '管理模型',
+    trash: '回收站', trash_desc: '删除的会议先放这里，保留 7 天后自动清理。',
+    trash_open: '打开回收站', trash_empty: '回收站是空的', trash_none_open: '没有可清理的项',
+    trash_restore: '恢复', trash_purge: '彻底删除', trash_clear: '清空回收站',
+    trash_clear_confirm: '清空回收站？里面的 {n} 条会议会被彻底删除，无法恢复。',
+    trash_purge_confirm: '彻底删除「{title}」？这一步不可撤销。',
+    trash_moved: '已移到回收站', trash_undo: '撤销', trash_undone: '已恢复',
+    trash_kept: '删于 {when} · 还剩 {days} 天',
+    trash_restored: '已恢复「{title}」', trash_purged: '已彻底删除', trash_cleared: '回收站已清空',
     first_title: '先准备两个本地模型',
     first_body: 'MeetLite 全部在本机跑，不上传任何音频。开始前需要两个模型文件：转写用的 Whisper 和写纪要用的 GGUF。可以直接下载，也可以用本机已有的文件。',
     first_download: '下载推荐模型',
@@ -356,6 +373,15 @@ const I18N = {
     language_desc: 'UI language; affects buttons and hints only.',
     asr_lang_desc: 'Language used for speech recognition. Auto detects, best for mixed Chinese/English meetings.',
     models: 'Models', models_desc: 'Local model files used for transcription and minutes.', model_manage: 'Manage',
+    trash: 'Trash', trash_desc: 'Deleted meetings stay here for 7 days, then are removed automatically.',
+    trash_open: 'Open trash', trash_empty: 'Trash is empty', trash_none_open: 'Nothing to clean up',
+    trash_restore: 'Restore', trash_purge: 'Delete forever', trash_clear: 'Empty trash',
+    trash_clear_confirm: 'Empty the trash? {n} meeting(s) will be deleted permanently.',
+    trash_purge_confirm: 'Delete "{title}" permanently? This cannot be undone.',
+    trash_moved: 'Moved to trash', trash_undo: 'Undo', trash_undone: 'Restored',
+    trash_kept: 'Deleted {when} · {days} days left',
+    trash_restored: 'Restored "{title}"', trash_purged: 'Deleted permanently', trash_cleared: 'Trash emptied',
+    ask_title: 'Confirm', ask_ok: 'Delete', ask_cancel: 'Cancel',
     first_title: 'Set up two local models first',
     first_body: 'MeetLite runs entirely on this machine and uploads no audio. It needs two model files: Whisper for transcription and a GGUF for the minutes. Download them here or point at files you already have.',
     first_download: 'Download recommended models',
@@ -427,6 +453,86 @@ function closeSettings(){
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#settingsMask').hidden) closeSettings();
 });
+// ---------------- 回收站 ----------------
+let TRASH = { items: [], days: 7 };
+
+function openTrash(){
+  $('#trashMask').hidden = false;
+  document.body.style.overflow = 'hidden';
+  renderTrash();  // 先显示「加载中」骨架
+  loadTrash();
+}
+function closeTrash(){
+  $('#trashMask').hidden = true;
+  document.body.style.overflow = '';
+}
+async function loadTrash(){
+  try{
+    const r = await fetch('/api/trash').then(x=>x.json());
+    TRASH.items = (r && r.items) || [];
+    TRASH.days = (r && r.days) || 7;
+    const hint = $('#trashHint');
+    if(hint) hint.textContent = t('trash_desc');
+    renderTrash();
+  }catch(e){
+    $('#tlist').innerHTML = '<div class="tempty">' + esc(String(e.message || e)) + '</div>';
+  }
+}
+function renderTrash(){
+  const el = $('#tlist'); if(!el) return;
+  const items = TRASH.items || [];
+  if(!items.length){
+    el.innerHTML = '<div class="tempty">' + t('trash_empty') + '</div>';
+    return;
+  }
+  el.innerHTML = items.map((it, i)=>{
+    const when = it.deleted_text || '';
+    const meta = t('trash_kept', { when: when, days: (it.days_left != null ? it.days_left : TRASH.days) })
+      + ' · ' + t('seg_count', { n: it.segments || 0 });
+    return `<div class="titem">
+      <div class="ti"><b title="${esc(it.title)}">${esc(it.title)}</b><span>${esc(meta)}</span></div>
+      <div class="tacts">
+        <button class="btn-ghost" onclick="restoreTrash(${i})">${t('trash_restore')}</button>
+        <button class="btn-ghost" onclick="purgeTrash(${i})">${t('trash_purge')}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function restoreTrash(i){
+  const it = (TRASH.items || [])[i]; if(!it) return;
+  try{
+    const j = await fetch('/api/trash/' + encodeURIComponent(it.entry) + '/restore', { method: 'POST' }).then(r=>r.json());
+    if(!j.ok){ toast(j.error || t('del_fail'), true); return; }
+    await loadTrash();
+    await loadMeetings();
+    toast(t('trash_restored', { title: it.title }));
+  }catch(e){ toast(e.message || String(e), true); }
+}
+async function purgeTrash(i){
+  const it = (TRASH.items || [])[i]; if(!it) return;
+  const yes = await askConfirm(t('trash_purge_confirm', { title: it.title }),
+                              { ok: t('trash_purge'), cancel: t('ask_cancel') });
+  if(!yes) return;
+  try{
+    await fetch('/api/trash/' + encodeURIComponent(it.entry), { method: 'DELETE' });
+    await loadTrash();
+    toast(t('trash_purged'));
+  }catch(e){ toast(e.message || String(e), true); }
+}
+async function clearTrash(){
+  const n = (TRASH.items || []).length;
+  if(!n){ toast(t('trash_none_open')); return; }
+  const yes = await askConfirm(t('trash_clear_confirm', { n: n }),
+                              { ok: t('trash_clear'), cancel: t('ask_cancel') });
+  if(!yes) return;
+  try{
+    const j = await fetch('/api/trash', { method: 'DELETE' }).then(r=>r.json());
+    if(!j.ok){ toast(j.error || t('del_fail'), true); return; }
+    await loadTrash();
+    toast(t('trash_cleared'));
+  }catch(e){ toast(e.message || String(e), true); }
+}
+
 // ---------------- 模型管理 ----------------
 let MODELS = [], MODELSTATE = { running: false };
 function fmtSize(n){
@@ -536,6 +642,7 @@ document.addEventListener('keydown', e => {
   if(e.key !== 'Escape') return;
   if(!$('#fbMask').hidden) closeFeedback();
   else if(!$('#modelsMask').hidden) closeModels();
+  else if(!$('#trashMask').hidden) closeTrash();
 });
 
 
@@ -951,6 +1058,20 @@ function toast(msg, isErr){
   _toastTimer = setTimeout(()=>{ el.className = ''; }, isErr ? 4600 : 2600);
 }
 
+/* 带「撤销」之类动作的提示 */
+function toastAction(msg, label, onAct, isErr){
+  const el = $('#toast'); if(!el) return;
+  el.textContent = '';
+  const span = document.createElement('span'); span.textContent = msg;
+  const btn = document.createElement('button');
+  btn.className = 'undo'; btn.textContent = label;
+  btn.onclick = ev => { ev.stopPropagation(); el.className = ''; try{ onAct && onAct(); }catch(_){} };
+  el.appendChild(span); el.appendChild(btn);
+  el.className = 'on act' + (isErr ? ' err' : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>{ el.className = ''; }, 6000);
+}
+
 let _askResolve = null;
 function askConfirm(msg, opt){
   const o = opt || {};
@@ -978,8 +1099,9 @@ async function delMeeting(id){
   const title = m ? (m.title || '') : '';
   const yes = await askConfirm(t('del_confirm',{title:title}), {ok:t('ask_ok'), cancel:t('ask_cancel')});
   if(!yes) return;
+  let r;
   try{
-    await api('/api/meetings/'+id, 'DELETE');
+    r = await api('/api/meetings/'+id, 'DELETE');
   }catch(e){
     setStatus(e.message || t('del_fail'), true);
     return;
@@ -990,6 +1112,15 @@ async function delMeeting(id){
   }
   await loadMeetings();
   setStatus(t('deleted'));
+  if(r && r.trash){
+    toastAction(t('trash_moved'), t('trash_undo'), async ()=>{
+      try{
+        await fetch('/api/trash/'+encodeURIComponent(r.trash)+'/restore', {method:'POST'});
+        await loadMeetings();
+        toast(t('trash_undone'));
+      }catch(_){ }
+    });
+  }
 }
 
 /* ---------------- 会议 ---------------- */
@@ -1233,6 +1364,15 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
       </div>
       <div class="srow">
         <div>
+          <div class="lbl" data-i18n="trash">回收站</div>
+          <div class="desc" data-i18n="trash_desc">删除的会议先放这里，保留 7 天后自动清理。</div>
+        </div>
+        <div class="sfield">
+          <button class="btn-ghost" onclick="openTrash()" data-i18n="trash_open">打开回收站</button>
+        </div>
+      </div>
+      <div class="srow">
+        <div>
           <div class="lbl" data-i18n="models">模型</div>
           <div class="desc" id="modelDesc" data-i18n="models_desc">转写与纪要使用的本地模型文件。</div>
         </div>
@@ -1331,6 +1471,23 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
         <input id="mfile" type="file" accept=".bin,.gguf,.zip" hidden onchange="uploadModel(this)">
       </div>
       <div class="mhint" data-i18n="models_hint">多镜像自动切换、断点续传、sha256 校验；也支持导入本地 .bin/.gguf 或 zip 压缩包。</div>
+    </div>
+  </div>
+</div>
+<div class="mask" id="trashMask" hidden onclick="if(event.target===this)closeTrash()">
+  <div class="sheet sheet-wide" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div>
+        <h3 data-i18n="trash">回收站</h3>
+        <div class="tempty" id="trashHint" style="padding:4px 0 0;text-align:left;font-size:11.5px" data-i18n="trash_desc">删除的会议先放这里，保留 7 天后自动清理。</div>
+      </div>
+      <button class="x" onclick="closeTrash()" aria-label="关闭">✕</button>
+    </div>
+    <div class="sheet-b">
+      <div class="mlist" id="tlist"></div>
+      <div class="mfrom" style="justify-content:flex-end">
+        <button class="btn-ghost" onclick="clearTrash()" data-i18n="trash_clear">清空回收站</button>
+      </div>
     </div>
   </div>
 </div>
