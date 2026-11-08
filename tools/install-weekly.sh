@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# 装一个每周一 08:00 的 launchd 任务，拉取 label=feedback 的 issue 生成周报。
+# 装一个每周一 10:00 的 launchd 任务，拉取 label=feedback 的 issue 生成周报。
 #
-#   bash tools/install-weekly.sh            # 安装并立刻跑一次
+#   bash tools/install-weekly.sh            # 安装并立刻跑一次（默认周一 10:00）
+#   bash tools/install-weekly.sh --hour 9   # 换时间
 #   bash tools/install-weekly.sh --no-run   # 只装不跑
 #   bash tools/install-weekly.sh --remove   # 卸载
 #
@@ -14,7 +15,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PY="$(command -v python3)"
 OUT="$ROOT/feedback/digest/weekly.log"
 
-if [[ "${1:-}" == "--remove" ]]; then
+HOUR=10
+REMOVE=0
+NORUN=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --hour) HOUR="${2:?--hour 需要小时数}"; shift 2 ;;
+    --remove) REMOVE=1; shift ;;
+    --no-run) NORUN=1; shift ;;
+    *) echo "未知参数：$1"; exit 2 ;;
+  esac
+done
+
+if [[ "$REMOVE" == "1" ]]; then
   launchctl unload -w "$PLIST" 2>/dev/null || true
   rm -f "$PLIST"
   echo "✓ 已移除 $LABEL"
@@ -51,7 +64,7 @@ cat > "$PLIST" <<PLISTEOF
   <key>StartCalendarInterval</key>
   <dict>
     <key>Weekday</key><integer>1</integer>
-    <key>Hour</key><integer>8</integer>
+    <key>Hour</key><integer>$HOUR</integer>
     <key>Minute</key><integer>0</integer>
   </dict>
   <key>StandardOutPath</key><string>$OUT</string>
@@ -63,10 +76,10 @@ PLISTEOF
 
 launchctl unload -w "$PLIST" 2>/dev/null || true
 launchctl load -w "$PLIST"
-echo "✓ 已安装：每周一 08:00 生成 $ROOT/feedback/digest/<日期>.md"
+echo "✓ 已安装：每周一 $(printf %02d "$HOUR"):00 生成 $ROOT/feedback/digest/<日期>.md"
 echo "  日志：$OUT"
 
-if [[ "${1:-}" != "--no-run" ]]; then
+if [[ "$NORUN" != "1" ]]; then
   echo "— 立刻跑一次 —"
   launchctl start "$LABEL"
   sleep 3

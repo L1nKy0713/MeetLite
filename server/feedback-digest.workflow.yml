@@ -1,10 +1,10 @@
 name: feedback-digest
 
-# 每周一 08:00（Asia/Shanghai）拉一次用户反馈，生成 Markdown 周报并提交。
-# GitHub Actions 的 cron 走 UTC：周一 00:00 UTC = 周一 08:00 北京时间。
+# 每周一 10:00（Asia/Shanghai）拉一次用户反馈，生成 Markdown 周报，提交并推到微信。
+# GitHub Actions 的 cron 走 UTC：周一 02:00 UTC = 周一 10:00 北京时间。
 on:
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: '0 2 * * 1'
   workflow_dispatch:
     inputs:
       days:
@@ -51,6 +51,18 @@ jobs:
           mkdir -p feedback/digest
           node server/feedback-digest.mjs /tmp/issues.json > "feedback/digest/${{ steps.win.outputs.date }}.md"
           sed -n '1,40p' "feedback/digest/${{ steps.win.outputs.date }}.md"
+
+      - name: 推到微信
+        env:
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          WECOM_FILE: 'true'
+        run: |
+          if [ -z "$WECOM_WEBHOOK" ]; then
+            echo "未配置 secrets.WECOM_WEBHOOK，跳过推送"
+            exit 0
+          fi
+          python3 tools/notify.py --file "feedback/digest/${{ steps.win.outputs.date }}.md" \
+            --card "反馈周报 · ${{ steps.win.outputs.date }}"
 
       - name: 写进 job summary
         run: cat "feedback/digest/${{ steps.win.outputs.date }}.md" >> "$GITHUB_STEP_SUMMARY"

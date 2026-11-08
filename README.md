@@ -149,48 +149,61 @@ cd server && wrangler deploy
 然后把 `https://<worker>.workers.dev/f?k=<FEEDBACK_TOKEN>` 填进每个客户端的
 `config.json → feedback_webhook`（或写进打包时的默认 `DEFAULTS`）。
 
-### 本机每周自动拉一次（不需要 Actions 权限）
+### 每周一 10:00：生成周报并推到微信
 
-`tools/feedback-weekly.py` 只用标准库，把最近 7 天的 `label=feedback` issue 折成
-`feedback/digest/<日期>.md`：
+一条链路：拉 issue → 折成 `.md` → 通过机器人推到微信。
 
 ```bash
+# 1) GitHub token（只读 issues 就够）
 echo "<你的 GitHub PAT>" > ~/.config/meetlite/gh_token && chmod 600 ~/.config/meetlite/gh_token
-python3 tools/feedback-weekly.py                 # 立刻跑一次
-python3 tools/feedback-weekly.py --days 30       # 换窗口
-python3 tools/feedback-weekly.py --stdout        # 只看不写
+
+# 2) 微信机器人（企业微信群机器人最省事，见下）
+cat > ~/.config/meetlite/notify.json <<'JSON'
+{
+  "wecom_webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=你的KEY",
+  "wecom_file": true
+}
+JSON
+
+# 3) 手动跑一次看看
+python3 tools/feedback-weekly.py
+
+# 4) 装成每周一 10:00 的定时任务
+bash tools/install-weekly.sh --no-run
 ```
 
-挂成每周一 08:00 的定时任务：
+`tools/feedback-weekly.py` 只用标准库：`--days 30` 换窗口、`--since 2026-11-01` 指定起点、
+`--stdout` 只看不写、`--no-push` 只生成、`--push-only` 把最新日报再推一次。
 
-- macOS：`bash tools/install-weekly.sh`（写 LaunchAgent `ai.meetlite.feedback`，
-  `Weekday=1 Hour=8`，装完立刻跑一次；`--remove` 卸载）。
-- Windows：`schtasks /create /tn MeetLite反馈周报 /sc weekly /d MON /st 08:00 ^
-  /tr "python tools\feedback-weekly.py"`。
+`tools/notify.py` 负责推送，支持三个通道（配置文件里的键名）：
 
-### 用 GitHub Actions 跑（需要 workflow 权限的 token 提交一次）
+| 通道 | 键 | 说明 |
+| --- | --- | --- |
+| 企业微信群机器人 | `wecom_webhook` | 群里加「群机器人」即可拿 webhook；支持 Markdown 卡片；`wecom_file: true` 时再把 `.md` 当文件发到群里（企业微信不支持 Markdown 表格，卡片会折成列表，完整表格看文件） |
+| Server酱 | `serverchan` | 推到你自己的微信服务号，`SCT` 开头的 SendKey，纯文本/Markdown |
+| WxPusher | `wxpusher` | `{"app_token": "AT_xxx", "uids": ["UID_xxx"]}`，走公众号推送 |
 
-仓库里的 `.github/workflows/feedback-digest.yml` 是免维护版本（UTC 周一 00:00 = 北京 08:00，
-结果贴在 Actions 的 Summary 页并提交 `feedback/digest/<日期>.md`）。
-注意：用只有 `repo` scope 的 OAuth token 无法通过 API 推送 `.github/workflows/*`（会 404），
-需要在网页端或用带 `workflow` scope 的 token 提交一次。
+也可以用环境变量覆盖（CI 方便）：`WECOM_WEBHOOK`、`WECOM_FILE`、`SCT_KEY`、`WXPUSHER_TOKEN`、`WXPUSHER_UIDS`。
+自测：`python3 tools/notify.py --test`。
 
-### 每周一 08:00 自动汇总
+macOS 的定时任务由 `tools/install-weekly.sh` 写成 LaunchAgent
+`ai.meetlite.feedback`（`Weekday=1 Hour=10 Minute=0`），日志在
+`feedback/digest/weekly.log`，`--hour 9` 换时间、`--remove` 卸载。
+Windows 用任务计划程序：
 
-`.github/workflows/feedback-digest.yml` 用 GitHub Actions 定时跑（UTC 周一 00:00 = 北京周一 08:00）：
-
-1. `gh api` 拉最近 7 天有更新的 `label=feedback` issue；
-2. `server/feedback-digest.mjs` 折成 Markdown（类型 / 标题 / 状态 / 链接 + 详情）；
-3. 写进 `feedback/digest/<日期>.md` 并提交，同时贴到该次 Actions 的 Summary 页。
-
-想改节奏就改 cron；想立刻拉一次用 `workflow_dispatch`（可传 `days`）。
-不需要 GitHub Actions 的话，本机 cron 一样能跑：
-
-```bash
-0 8 * * 1 cd ~/MeetLite && gh api -X GET repos/L1nKy0713/MeetLite/issues \
-  -f state=all -f labels=feedback -f per_page=100 > /tmp/i.json \
-  && node server/feedback-digest.mjs /tmp/i.json > feedback/digest/$(date +\%F).md
+```bat
+schtasks /create /tn MeetLite反馈周报 /sc weekly /d MON /st 10:00 ^
+  /tr "python tools\feedback-weekly.py"
 ```
+
+### 用 GitHub Actions 跑（可选，需要 workflow 权限提交一次）
+
+`server/feedback-digest.workflow.yml` 是免维护版本：UTC 周一 02:00 = 北京周一 10:00，
+拉 issue → `server/feedback-digest.mjs` 折成 Markdown → 写进 `feedback/digest/<日期>.md` 并提交，
+同时贴到该次 Actions 的 Summary 页，最后调 `tools/notify.py` 推到微信（需要仓库 secret `WECOM_WEBHOOK`）。
+
+启用方式：把该文件复制到 `.github/workflows/feedback-digest.yml` 提交一次。用只有 `repo` scope 的
+OAuth token 通过 API 推送 `.github/workflows/*` 会 404，需要在网页端或用带 `workflow` scope 的 token 提交。
 
 ## 依赖（已在本机装好）
 

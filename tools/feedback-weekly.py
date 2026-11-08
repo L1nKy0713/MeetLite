@@ -122,6 +122,8 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--since", help="ISO 时间，优先于 --days")
     ap.add_argument("--stdout", action="store_true", help="只打印，不写文件")
+    ap.add_argument("--no-push", action="store_true", help="不推微信")
+    ap.add_argument("--push-only", action="store_true", help="不拉取，只把最新日报再推一次")
     args = ap.parse_args()
 
     tz = timezone(timedelta(hours=8))
@@ -131,6 +133,19 @@ def main() -> int:
         if args.since
         else now - timedelta(days=args.days)
     )
+    if args.push_only:
+        files = sorted(OUT_DIR.glob("*.md"))
+        if not files:
+            sys.exit(f"{OUT_DIR} 里还没有日报，先跑一次不带 --push-only 的")
+        latest = files[-1]
+        print(f"→ 只推送：{latest}")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import notify
+        res = notify.push(latest.read_text(encoding="utf-8"), latest, f"反馈周报 · {latest.stem}", None)
+        for r in res or []:
+            print(("✓ " if r.get("ok") else "✗ ") + str(r.get("channel")) + " " + str(r.get("sent") or r.get("error") or ""))
+        return 0 if not res or any(r.get("ok") for r in res) else 1
+
     issues = fetch_issues(token(), since.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     issues.sort(key=lambda i: i.get("created_at") or "", reverse=True)
     md = render(issues, since, now)
@@ -142,6 +157,20 @@ def main() -> int:
     path = OUT_DIR / f"{now:%Y-%m-%d}.md"
     path.write_text(md, encoding="utf-8")
     print(f"✓ {path}（{len(issues)} 条）")
+
+    if not args.no_push:
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import notify  # noqa: WPS433
+            results = notify.push(md, path, f"反馈周报 · {now:%Y-%m-%d}", len(issues))
+        except Exception as e:
+            print(f"[push] 跳过：{type(e).__name__}: {e}", file=sys.stderr)
+            return 0
+        if not results:
+            print("[push] 没配置推送通道，跳过（见 tools/notify.py 顶部说明）")
+        for r in results:
+            flag = "✓" if r.get("ok") else "✗"
+            print(f"[push] {flag} {r.get('channel')} {r.get('sent') or ''} {r.get('error') or ''}".rstrip())
     return 0
 
 
