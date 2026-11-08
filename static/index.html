@@ -297,10 +297,10 @@ const I18N = {
   zh: {
     new_meeting: '＋ 新建会议', import: '导入', import_title: '导入已有音频',
     display: '显示', light: '白天', dark: '黑夜', auto: '跟随系统',
-    language: '语言', asr_lang_title: '转写语言',
+    language: '语言 · Language', asr_lang_title: '转写语言 · Language',
     settings: '设置', asr_lang: '转写语言',
     display_desc: '界面配色，跟随系统时随 macOS 自动切换。',
-    language_desc: '界面语言，只影响按钮与提示文字。',
+    language_desc: '界面语言 · Interface language。只影响按钮与提示文字，不影响转写结果。',
     asr_lang_desc: '语音识别使用的语言。选「自动识别」会自己判断，会议里混说中英文时最稳。',
     models: '模型', models_desc: '转写与纪要使用的本地模型文件。', model_manage: '管理模型',
     trash: '回收站', trash_desc: '删除的会议先放这里，保留 7 天后自动清理。',
@@ -372,10 +372,10 @@ const I18N = {
   en: {
     new_meeting: '＋ New meeting', import: 'Import', import_title: 'Import an existing audio file',
     display: 'Display', light: 'Light', dark: 'Dark', auto: 'System',
-    language: 'Language', asr_lang_title: 'Transcription language',
+    language: 'Language · 语言', asr_lang_title: 'Transcription language · 转写语言',
     settings: 'Settings', asr_lang: 'Transcription language',
     display_desc: 'Appearance. Follow system switches with macOS automatically.',
-    language_desc: 'UI language; affects buttons and hints only.',
+    language_desc: 'Interface language · 界面语言. Affects buttons and hints only, not transcription.',
     asr_lang_desc: 'Language used for speech recognition. Auto detects, best for mixed Chinese/English meetings.',
     models: 'Models', models_desc: 'Local model files used for transcription and minutes.', model_manage: 'Manage',
     trash: 'Trash', trash_desc: 'Deleted meetings stay here for 7 days, then are removed automatically.',
@@ -1399,8 +1399,8 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
       </div>
       <div class="srow">
         <div>
-          <div class="lbl" data-i18n="language">语言</div>
-          <div class="desc" data-i18n="language_desc">界面语言，只影响按钮与提示文字。</div>
+          <div class="lbl" data-i18n="language">语言 · Language</div>
+          <div class="desc" data-i18n="language_desc">界面语言 · Interface language。只影响按钮与提示文字，不影响转写结果。</div>
         </div>
         <div class="sfield">
           <div class="seg-ctl" id="langCtl">

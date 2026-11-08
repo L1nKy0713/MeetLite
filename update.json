@@ -1,15 +1,15 @@
 {
-  "version": "1.3.0",
+  "version": "1.3.1",
   "published": "2026-11-08",
-  "notes": "1.3.0：关闭窗口不再等于退出。点红点时按你的选择走：放进后台继续录音转写、直接退出，或者每次都问你一遍；弹层里勾「总是使用该选项」就记住这次的选择，也可以在 设置 → 关闭窗口时 随时改（每次询问 / 放到后台 / 直接退出）。放到后台后窗口消失但引擎还在跑，点 Dock 图标或重新打开应用就回到界面。\n\nWindows: MeetLite-1.3.0-win.zip（首次启动按提示下载模型）",
+  "notes": "1.3.1：设置里的「语言」一项改成中英对照（语言 · Language），英文界面下显示为 Language · 语言，非中文用户也能一眼找到切换入口。\n\nWindows: MeetLite-1.3.1-win.zip（首次启动按提示下载模型）",
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.0/MeetLite-1.3.0.zip",
-    "size": 1094493,
-    "sha256": "4a1511cb6ec190df8de61192a3b6e092779d5e5d780049124d84c1577d4fa6eb"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.1/MeetLite-1.3.1.zip",
+    "size": 1112321,
+    "sha256": "919268cbb731eae675baf9ccb8bff72c2b321a76efe5cf4004d083a7ddd9388d"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.0/MeetLite-1.3.0-win.zip",
-    "size": 24243073,
-    "sha256": "91381b136b5adedb072fba8f6d5dea1272d4e97da3db029f527078c810465f26"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.3.1/MeetLite-1.3.1-win.zip",
+    "size": 24243138,
+    "sha256": "2392c3345374f26867fdd9147c6cacd6285f2c93707595cb1c1d0742b79e3f42"
   }
 }
