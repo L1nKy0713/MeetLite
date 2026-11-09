@@ -1,21 +1,21 @@
 {
-  "version": "1.4.5",
+  "version": "1.4.6",
   "published": "2026-11-09",
   "notes": [
-    "界面：设置里「更新」的说明改成独立滚动区（最高 120px），右侧是一条可以拖动的细滚动条，滚轮/触控板也能翻；长说明不再被省略号截断。",
-    "「下载并安装」按钮固定一行、垂直居中，不再被说明文字挤压成竖排四个字。",
-    "修复：设置里「检查更新 → 下载并安装」报 `Method is not a valid HTTP token` —— 前端 api() 的第二个参数被传成了对象，WebKit 把请求方法当成了 `[object Object]`，请求根本没发出去。",
-    "修复：更新下载的进度轮询接口少一个 ok 字段，前端把它当成失败；现在返回 ok:true，进度条能走到 100%。模型管理里「下载」「使用」按钮同根因，一并修好。",
-    "macOS 与 Windows 同步到 1.4.5。"
+    "界面：设置里所有较长的说明文字都换成和「更新说明」同一套滚动区——固定高度、右侧可拖的细滚动条，文字超过才出现，短说明看不出来。",
+    "更新说明仍是 120px 高；其余说明按 60–72px 收口，设置面板不会被长文案撑高。",
+    "「下载并安装」按钮固定一行、垂直居中。",
+    "修复（沿用 1.4.5）：`Method is not a valid HTTP token`（api() 第二个参数传成对象）与进度轮询缺 ok 字段，模型下载/切换按钮同根因一并修好。",
+    "macOS 与 Windows 同步到 1.4.6。"
   ],
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.5/MeetLite-1.4.5.zip",
-    "size": 1113827,
-    "sha256": "4ee99e8f3c64e7cb859e6498859836fe52b3546c78e469d66d160beda70ddcec"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.6/MeetLite-1.4.6.zip",
+    "size": 1114277,
+    "sha256": "1d30d1d0e8fa4825e2baa371c7759cbf7b4d3e2df784e43437a40b300b7050d6"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.5/MeetLite-1.4.5-win.zip",
-    "size": 24247183,
-    "sha256": "dc42ca6980cb3dd682ed3c5cd4b0008e171306a1b02d599450d7a7432c52ad62"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.6/MeetLite-1.4.6-win.zip",
+    "size": 24247642,
+    "sha256": "60f3b894055fecfca610453c9e33287fbb00f8124f9ecf304ca9af7acc393e2b"
   }
 }

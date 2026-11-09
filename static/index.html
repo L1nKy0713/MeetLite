@@ -121,6 +121,15 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 .upd-sb i{position:absolute;left:0;right:0;top:0;min-height:24px;border-radius:99px;background:var(--dim);opacity:.75}
 .upd-sb:hover i,.upd-sb.dragging i{opacity:1;background:var(--accent)}
 .upd-box #btnDoUpd{flex:0 0 auto;white-space:nowrap}
+.sd-wrap{display:flex;gap:8px;align-items:center;min-width:0}
+.sd-wrap > :first-child{flex:1 1 auto;min-width:0;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;scrollbar-width:none;-ms-overflow-style:none}
+.sd-wrap > :first-child::-webkit-scrollbar{width:0;height:0}
+.sd-sb{flex:0 0 auto;width:6px;align-self:stretch;position:relative;border-radius:99px;
+  background:var(--meter-bg);cursor:pointer;touch-action:none}
+.sd-sb[hidden]{display:none}
+.sd-sb i{position:absolute;left:0;right:0;top:0;min-height:20px;border-radius:99px;background:var(--dim);opacity:.75}
+.sd-sb:hover i,.sd-sb.dragging i{opacity:1;background:var(--accent)}
 .mprog-t{font-size:12px;color:var(--dim)}
 .mprog-bar{height:6px;border-radius:99px;background:var(--meter-bg);overflow:hidden}
 .mprog-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
@@ -799,37 +808,36 @@ function showUpd(text, canInstall){
   $('#updBox').hidden = false;
   $('#updText').textContent = text;
   $('#btnDoUpd').hidden = !canInstall;
-  requestAnimationFrame(syncUpdScroll);
+  requestAnimationFrame(syncAllBars);
 }
-// 更新说明的细滚动条：WKWebView 不支持 ::-webkit-scrollbar，所以自己画一条
-function syncUpdScroll(){
-  const t = $('#updText'), sb = $('#updSb'), th = $('#updThumb');
-  if(!t || !sb || !th) return;
-  const over = t.scrollHeight - t.clientHeight > 2;
-  sb.hidden = !over;
-  if(!over) return;
-  const track = t.clientHeight;
-  const h = Math.max(24, Math.round(track * t.clientHeight / t.scrollHeight));
-  const span = Math.max(1, t.scrollHeight - t.clientHeight);
-  const y = Math.round((track - h) * Math.min(1, Math.max(0, t.scrollTop / span)));
-  th.style.height = h + 'px';
-  th.style.transform = 'translateY(' + y + 'px)';
-}
-function bindUpdScrollbar(){
-  const t = $('#updText'), sb = $('#updSb');
-  if(!t || !sb) return;
-  t.addEventListener('scroll', syncUpdScroll, {passive:true});
-  window.addEventListener('resize', () => syncUpdScroll());
+// 细滚动条：WKWebView 不支持 ::-webkit-scrollbar，所以自己画一条（更新说明与设置里的长说明共用）
+const BARS = [];
+function bindBar(t, sb){
+  if(!t || !sb || t.__barBound) return null;
+  t.__barBound = 1;
+  const th = sb.firstElementChild;
+  const sync = () => {
+    const over = t.scrollHeight - t.clientHeight > 2;
+    sb.hidden = !over;
+    if(!over) return;
+    const track = t.clientHeight;
+    const span = Math.max(1, t.scrollHeight - t.clientHeight);
+    const h = Math.max(20, Math.round(track * t.clientHeight / t.scrollHeight));
+    const y = Math.round((track - h) * Math.min(1, Math.max(0, t.scrollTop / span)));
+    th.style.height = h + 'px';
+    th.style.transform = 'translateY(' + y + 'px)';
+  };
+  t.addEventListener('scroll', sync, {passive:true});
   sb.addEventListener('wheel', e => { t.scrollTop += e.deltaY; e.preventDefault(); }, {passive:false});
   let drag = null;
   sb.addEventListener('pointerdown', e => {
-    const r = sb.getBoundingClientRect(), th = $('#updThumb').getBoundingClientRect();
+    const r = sb.getBoundingClientRect(), tr = th.getBoundingClientRect();
     const span = t.scrollHeight - t.clientHeight;
-    if(e.clientY >= th.top && e.clientY <= th.bottom){
-      drag = {off: e.clientY - th.top};
+    if(e.clientY >= tr.top && e.clientY <= tr.bottom){
+      drag = {off: e.clientY - tr.top};
     }else{
       t.scrollTop = (e.clientY - r.top) / r.height * span - t.clientHeight / 2;
-      drag = {off: th.height / 2};
+      drag = {off: tr.height / 2};
     }
     sb.classList.add('dragging');
     sb.setPointerCapture(e.pointerId);
@@ -837,8 +845,8 @@ function bindUpdScrollbar(){
   });
   sb.addEventListener('pointermove', e => {
     if(!drag) return;
-    const r = sb.getBoundingClientRect(), th = $('#updThumb').getBoundingClientRect();
-    const span = t.scrollHeight - t.clientHeight, room = r.height - th.height;
+    const r = sb.getBoundingClientRect(), tr = th.getBoundingClientRect();
+    const span = t.scrollHeight - t.clientHeight, room = r.height - tr.height;
     if(room <= 0 || span <= 0) return;
     const y = Math.min(room, Math.max(0, e.clientY - r.top - drag.off));
     t.scrollTop = y / room * span;
@@ -846,7 +854,33 @@ function bindUpdScrollbar(){
   const stop = () => { drag = null; sb.classList.remove('dragging'); };
   sb.addEventListener('pointerup', stop);
   sb.addEventListener('pointercancel', stop);
+  BARS.push(sync);
+  sync();
+  return sync;
 }
+function syncAllBars(){ BARS.forEach(f => { try{ f(); }catch(e){} }); }
+// 把一段长说明包成「文字 + 右侧细滚动条」，超过 maxH 才出现滚动条
+function makeScrollable(el, maxH){
+  if(!el || el.__scrd || !el.parentNode) return;
+  el.__scrd = 1;
+  el.style.maxHeight = maxH + 'px';
+  const wrap = document.createElement('div');
+  wrap.className = 'sd-wrap';
+  el.parentNode.insertBefore(wrap, el);
+  wrap.appendChild(el);
+  const sb = document.createElement('div');
+  sb.className = 'sd-sb';
+  sb.innerHTML = '<i></i>';
+  wrap.appendChild(sb);
+  bindBar(el, sb);
+}
+function bindUpdScrollbar(){
+  bindBar($('#updText'), $('#updSb'));
+  window.addEventListener('resize', syncAllBars);
+  const SEL = '.srow .desc, #modelMask .desc, #fbMask .desc, #firstMask .desc, .mhint';
+  document.querySelectorAll(SEL).forEach(el => makeScrollable(el, el.classList.contains('mhint') ? 60 : 72));
+}
+
 async function doUpdate(){
   if(UPD.busy) return;
   UPD.busy = true;
@@ -898,6 +932,7 @@ function applyI18n(){
   document.querySelectorAll('#langCtl button').forEach(b=>{
     b.classList.toggle('on', b.getAttribute('data-lang-opt') === LANG);
   });
+  setTimeout(syncAllBars, 0);
   const c = document.querySelector('#conn');
   if(c && (c.textContent === I18N.zh.conn_ok || c.textContent === I18N.en.conn_ok)) c.textContent = t('conn_ok');
 }
