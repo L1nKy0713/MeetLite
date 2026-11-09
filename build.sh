@@ -14,6 +14,7 @@ cp -R server.py config.py store.py capture.py whisper_engine.py llm.py summarize
       platforms.py model_manager.py models.json updater.py audiodec.py feedback.py trash.py \
       static templates bin "$APP/Contents/Resources/app/"
 find "$APP/Contents/Resources/app" -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+cp README.md THIRD_PARTY.md LICENSE "$APP/Contents/Resources/app/" 2>/dev/null || true
 
 echo "› 图标"
 ICONSET=$(mktemp -d)/MeetLite.iconset

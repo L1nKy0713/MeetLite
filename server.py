@@ -560,7 +560,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(res)
 
         if p == "/api/update/progress" and method == "GET":
-            return self._json(dict(updater.PROGRESS))
+            res = dict(updater.PROGRESS)
+            res["ok"] = True          # 前端 api() 要求 ok 字段，否则整条轮询会被当成失败
+            return self._json(res)
 
         if p == "/api/update/download" and method == "POST":
             body = self._body() or {}

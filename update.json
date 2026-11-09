@@ -1,23 +1,23 @@
 {
-  "version": "1.4.2",
-  "published": "2026-11-08",
+  "version": "1.4.3",
+  "published": "2026-11-09",
   "notes": [
-    "Windows：包内现在带真机编译、内嵌 PerMonitorV2 清单的 MeetLite.exe，双击 start.bat 直接出原生窗口（托盘、关闭三选项都回来了）",
-    "Windows：DPI 修复落地 —— 窗口按 CSS 像素 × dpi/96 计算，125% 缩放下 CSS 视口 1220×746，右上角下拉不再被裁，文字不再发虚",
-    "Windows：start.bat 单一入口（纯 ASCII + CRLF），删除重复且会乱码的「启动.bat」；说明文件改 ASCII 名 README.txt",
-    "构建：build-win.ps1 默认复用 windows/prebuilt 里已验过的外壳，没有 .NET SDK 也能出完整包；-SkipShell 可强制浏览器模式",
-    "macOS：同步版本号与文档，无功能变化"
+    "修复：设置里「检查更新 → 下载并安装」报 `Method is not a valid HTTP token`。前端 api() 的第二个参数被传成了对象，WebKit 直接把请求方法当成一串 `[object Object]`，于是请求根本没发出去；现在两种写法都兼容，并把所有调用点改成规范形式。",
+    "修复：更新下载的进度轮询接口少一个 ok 字段，导致前端把它当成失败；现在 /api/update/progress 返回 ok:true，进度条能正常走到 100%。",
+    "修复（同一根因）：模型管理里「下载」「使用」按钮也是对象写法，1.4.2 及之前同样会报这句错，一并修好。",
+    "构建：build.sh 现在会把 README.md / THIRD_PARTY.md / LICENSE 一起放进 app 包，macOS 包内文档不再缺失",
+    "macOS 与 Windows 同步到 1.4.3"
   ],
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.2/MeetLite-1.4.2.zip",
-    "size": 1112704,
-    "sha256": "57e0cee65751233c7c7b842eda57a6d9d558d52443efad56b2ca7faa6b523150",
-    "version": "1.4.2"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.3/MeetLite-1.4.3.zip",
+    "size": 1112899,
+    "sha256": "5352654b3c81a7eaac0c176ee51f3b065e3bd2f7a81d122c24eebd573b7283e3",
+    "version": "1.4.3"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.2/MeetLite-1.4.2-win.zip",
-    "size": 24246065,
-    "sha256": "08bfedac1898c28bb15b75e6335c40802278635338d09133ad6dfb7c94b5ef49",
-    "version": "1.4.2"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.3/MeetLite-1.4.3-win.zip",
+    "size": 24246256,
+    "sha256": "22206c0c5863ab443c5257682be6e9ad797577d201a6a92d51698ae85c017234",
+    "version": "1.4.3"
   }
 }
