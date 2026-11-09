@@ -108,9 +108,18 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 .upd-box{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap;
   padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-top:-6px}
 .upd-box[hidden]{display:none}
-.upd-t{flex:1 1 auto;min-width:0;max-width:min(100%, 420px);
+.upd-wrap{flex:1 1 auto;min-width:0;max-width:min(100%,460px);display:flex;gap:8px;align-items:stretch}
+.upd-t{flex:1 1 auto;min-width:0;
   font-size:12px;color:var(--fg);line-height:1.6;white-space:pre-wrap;word-break:break-word;
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden}
+  max-height:120px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  scrollbar-width:none;-ms-overflow-style:none;outline:none}
+.upd-t::-webkit-scrollbar{width:0;height:0}
+.upd-t:focus-visible{box-shadow:0 0 0 2px var(--accent);border-radius:6px}
+.upd-sb{flex:0 0 auto;width:6px;align-self:stretch;position:relative;border-radius:99px;
+  background:var(--meter-bg);cursor:pointer;touch-action:none}
+.upd-sb[hidden]{display:none}
+.upd-sb i{position:absolute;left:0;right:0;top:0;min-height:24px;border-radius:99px;background:var(--dim);opacity:.75}
+.upd-sb:hover i,.upd-sb.dragging i{opacity:1;background:var(--accent)}
 .upd-box #btnDoUpd{flex:0 0 auto;white-space:nowrap}
 .mprog-t{font-size:12px;color:var(--dim)}
 .mprog-bar{height:6px;border-radius:99px;background:var(--meter-bg);overflow:hidden}
@@ -790,6 +799,53 @@ function showUpd(text, canInstall){
   $('#updBox').hidden = false;
   $('#updText').textContent = text;
   $('#btnDoUpd').hidden = !canInstall;
+  requestAnimationFrame(syncUpdScroll);
+}
+// 更新说明的细滚动条：WKWebView 不支持 ::-webkit-scrollbar，所以自己画一条
+function syncUpdScroll(){
+  const t = $('#updText'), sb = $('#updSb'), th = $('#updThumb');
+  if(!t || !sb || !th) return;
+  const over = t.scrollHeight - t.clientHeight > 2;
+  sb.hidden = !over;
+  if(!over) return;
+  const track = t.clientHeight;
+  const h = Math.max(24, Math.round(track * t.clientHeight / t.scrollHeight));
+  const span = Math.max(1, t.scrollHeight - t.clientHeight);
+  const y = Math.round((track - h) * Math.min(1, Math.max(0, t.scrollTop / span)));
+  th.style.height = h + 'px';
+  th.style.transform = 'translateY(' + y + 'px)';
+}
+function bindUpdScrollbar(){
+  const t = $('#updText'), sb = $('#updSb');
+  if(!t || !sb) return;
+  t.addEventListener('scroll', syncUpdScroll, {passive:true});
+  window.addEventListener('resize', () => syncUpdScroll());
+  sb.addEventListener('wheel', e => { t.scrollTop += e.deltaY; e.preventDefault(); }, {passive:false});
+  let drag = null;
+  sb.addEventListener('pointerdown', e => {
+    const r = sb.getBoundingClientRect(), th = $('#updThumb').getBoundingClientRect();
+    const span = t.scrollHeight - t.clientHeight;
+    if(e.clientY >= th.top && e.clientY <= th.bottom){
+      drag = {off: e.clientY - th.top};
+    }else{
+      t.scrollTop = (e.clientY - r.top) / r.height * span - t.clientHeight / 2;
+      drag = {off: th.height / 2};
+    }
+    sb.classList.add('dragging');
+    sb.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  sb.addEventListener('pointermove', e => {
+    if(!drag) return;
+    const r = sb.getBoundingClientRect(), th = $('#updThumb').getBoundingClientRect();
+    const span = t.scrollHeight - t.clientHeight, room = r.height - th.height;
+    if(room <= 0 || span <= 0) return;
+    const y = Math.min(room, Math.max(0, e.clientY - r.top - drag.off));
+    t.scrollTop = y / room * span;
+  });
+  const stop = () => { drag = null; sb.classList.remove('dragging'); };
+  sb.addEventListener('pointerup', stop);
+  sb.addEventListener('pointercancel', stop);
 }
 async function doUpdate(){
   if(UPD.busy) return;
@@ -1360,7 +1416,7 @@ if(window.matchMedia){
     if((PREF.theme || 'auto') === 'auto') applyTheme('auto');
   });
 }
-loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n(); applyTheme(PREF.theme); applyCloseCtl(); boot(); });
+loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n(); applyTheme(PREF.theme); applyCloseCtl(); bindUpdScrollbar(); boot(); });
 </script>
 <div id="toast" role="status" aria-live="polite"></div>
 <div class="mask" id="askMask" hidden onclick="if(event.target===this)askClose(false)">
@@ -1443,7 +1499,10 @@ loadPrefs().then(()=>{ LANG = (PREF.ui_lang === 'en') ? 'en' : 'zh'; applyI18n()
         </div>
       </div>
       <div class="upd-box" id="updBox" hidden>
-        <div class="upd-t" id="updText"></div>
+        <div class="upd-wrap">
+          <div class="upd-t" id="updText" tabindex="0"></div>
+          <div class="upd-sb" id="updSb" hidden><i id="updThumb"></i></div>
+        </div>
         <button class="btn-ghost" id="btnDoUpd" onclick="doUpdate()" data-i18n="download_install">下载并安装</button>
       </div>
       <div class="srow">

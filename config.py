@@ -8,7 +8,7 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.4.4"
+APP_VERSION = "1.4.5"
 DATA_DIR = platforms.data_dir()
 LEGACY_DATA = (platforms.legacy_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()

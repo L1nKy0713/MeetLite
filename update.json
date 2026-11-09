@@ -1,21 +1,21 @@
 {
-  "version": "1.4.4",
+  "version": "1.4.5",
   "published": "2026-11-09",
   "notes": [
-    "界面：设置里「更新」的说明文字收窄（最多 5 行，超出的用省略号），「下载并安装」按钮固定为一行，不再被挤成竖排四个字。",
-    "修复：设置里「检查更新 → 下载并安装」报 `Method is not a valid HTTP token` —— 前端 api() 的第二个参数被传成了对象，WebKit 把请求方法当成了 `[object Object]`，请求根本没发出去；现在两种写法都兼容，调用点也改成规范形式。",
-    "修复：更新下载的进度轮询接口少一个 ok 字段，前端把它当成失败；现在返回 ok:true，进度条能走到 100%。",
-    "修复（同一根因）：模型管理里「下载」「使用」按钮也是对象写法，1.4.2 及之前同样会报这句错，一并修好。",
-    "macOS 与 Windows 同步到 1.4.4。"
+    "界面：设置里「更新」的说明改成独立滚动区（最高 120px），右侧是一条可以拖动的细滚动条，滚轮/触控板也能翻；长说明不再被省略号截断。",
+    "「下载并安装」按钮固定一行、垂直居中，不再被说明文字挤压成竖排四个字。",
+    "修复：设置里「检查更新 → 下载并安装」报 `Method is not a valid HTTP token` —— 前端 api() 的第二个参数被传成了对象，WebKit 把请求方法当成了 `[object Object]`，请求根本没发出去。",
+    "修复：更新下载的进度轮询接口少一个 ok 字段，前端把它当成失败；现在返回 ok:true，进度条能走到 100%。模型管理里「下载」「使用」按钮同根因，一并修好。",
+    "macOS 与 Windows 同步到 1.4.5。"
   ],
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.4/MeetLite-1.4.4.zip",
-    "size": 1112959,
-    "sha256": "9e6395d6e3bb8c0b5de99f2d55ab96822d378d80107cdd521a38a01376d358c9"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.5/MeetLite-1.4.5.zip",
+    "size": 1113827,
+    "sha256": "4ee99e8f3c64e7cb859e6498859836fe52b3546c78e469d66d160beda70ddcec"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.4/MeetLite-1.4.4-win.zip",
-    "size": 24246333,
-    "sha256": "0be6dcf6041200edca979c3747fb95a8fa473dff1a248f4dc18f96ae1be70559"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.5/MeetLite-1.4.5-win.zip",
+    "size": 24247183,
+    "sha256": "dc42ca6980cb3dd682ed3c5cd4b0008e171306a1b02d599450d7a7432c52ad62"
   }
 }
