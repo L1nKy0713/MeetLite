@@ -105,10 +105,13 @@ aside{width:248px;flex:0 0 248px;border-right:1px solid var(--line);background:v
 #firstMask .desc{line-height:1.75;font-size:13px}
 .settings-btn.has-upd::after{content:'';position:absolute;top:6px;right:8px;width:7px;height:7px;border-radius:50%;background:#e5484d}
 .settings-btn{position:relative}
-.upd-box{display:flex;align-items:center;justify-content:space-between;gap:14px;
+.upd-box{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap;
   padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-top:-6px}
 .upd-box[hidden]{display:none}
-.upd-t{font-size:12px;color:var(--fg);line-height:1.6;white-space:pre-wrap;max-height:132px;overflow:auto}
+.upd-t{flex:1 1 auto;min-width:0;max-width:min(100%, 420px);
+  font-size:12px;color:var(--fg);line-height:1.6;white-space:pre-wrap;word-break:break-word;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden}
+.upd-box #btnDoUpd{flex:0 0 auto;white-space:nowrap}
 .mprog-t{font-size:12px;color:var(--dim)}
 .mprog-bar{height:6px;border-radius:99px;background:var(--meter-bg);overflow:hidden}
 .mprog-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
