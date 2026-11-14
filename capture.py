@@ -47,6 +47,77 @@ def rms_of(pcm: bytes) -> float:
     return math.sqrt(s / max(n, 1))
 
 
+def segment_pcm(pcm: bytes, max_ms: int = 12000, silence_ms: int = 600,
+                gate_min: float = 0.012, preroll_ms: int = 200,
+                tail_ms: int = 250) -> list:
+    """把整段 16k/mono/s16le PCM 按静音切成 <=max_ms 的片段。
+
+    返回 [(start_ms, end_ms, pcm)]。规则与实时采集一致：门限随环境噪声自适应，
+    静音超过 silence_ms 收口，太长强制切。大段静音不产出片段——whisper 在纯静音上
+    容易幻听出 "Thank you."。
+
+    为什么不是定长 30 秒：whisper 一次解码只认一个语言标签，30 秒窗口里中英混说时
+    非目标语言会被整段丢弃；按句子切之后每段基本是单一语言，`language=auto` 才可靠。
+    """
+    frame = FRAME_BYTES
+    n = len(pcm) // frame
+    if n <= 0:
+        return []
+    out: list[tuple[int, int, bytes]] = []
+    noise = 0.004
+    voiced_run = 0
+    silent_run = 0
+    in_speech = False
+    start_i = 0
+    last_voiced_i = 0
+    preroll_frames = max(1, preroll_ms // FRAME_MS)
+    tail_frames = max(1, tail_ms // FRAME_MS)
+    need_silence = max(1, silence_ms // FRAME_MS)
+    max_frames = max(1, max_ms // FRAME_MS)
+
+    def emit(a: int, b: int):
+        b = min(b, n)
+        a = max(0, min(a, b))
+        if b <= a:
+            return
+        out.append((a * FRAME_MS, b * FRAME_MS, pcm[a * frame:b * frame]))
+
+    for i in range(n):
+        level = rms_of(pcm[i * frame:(i + 1) * frame])
+        gate = max(gate_min, noise * 2.2)
+        voiced = level >= gate
+        if not voiced:
+            noise = min(gate_min, noise * 0.98 + level * 0.02)
+        if voiced:
+            voiced_run += 1
+            if not in_speech and voiced_run >= 3:
+                in_speech = True
+                start_i = max(0, i - preroll_frames)
+                silent_run = 0
+            if in_speech:
+                last_voiced_i = i
+                silent_run = 0
+                if (i - start_i + 1) >= max_frames:
+                    emit(start_i, i + 1)
+                    in_speech = False
+                    voiced_run = 0
+        else:
+            voiced_run = 0
+            if in_speech:
+                silent_run += 1
+                if silent_run >= need_silence:
+                    emit(start_i, last_voiced_i + 1 + tail_frames)
+                    in_speech = False
+                    silent_run = 0
+    if in_speech:
+        emit(start_i, last_voiced_i + 1 + tail_frames)
+
+    if not out:  # 整段没测到语音（很安静的录音）：退回定长切片，别把内容丢了
+        for j in range(0, n, max_frames):
+            emit(j, j + max_frames)
+    return out
+
+
 class _Proc:
     """把某个子进程的 stdout 当 16k/mono/s16le 流，按 50ms 帧推送。"""
 
@@ -316,6 +387,10 @@ class Recorder:
             if not cap.is_file():
                 self.on_error(f"系统声音采集组件缺失（{cap.name}），已仅使用麦克风")
             elif not system_audio_allowed():
+                # 关键：不要直接抛错就完事。这台机器上「系统设置 → 屏幕录制」里
+                # 那一条很可能是上一次构建的旧记录（ad-hoc 签名每次重建都换指纹），
+                # 勾着却无效。此时主动申请一次，系统才会为当前二进制弹出授权框。
+                platforms.request_system_audio()
                 raise RuntimeError("NEED_SCREEN_PERMISSION")
             else:
                 sysp = _Proc("system", platforms.system_capture_argv(RATE))

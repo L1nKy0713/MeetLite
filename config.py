@@ -8,7 +8,7 @@ from pathlib import Path
 
 import platforms
 
-APP_VERSION = "1.4.6"
+APP_VERSION = "1.4.8"
 DATA_DIR = platforms.data_dir()
 LEGACY_DATA = (platforms.legacy_dirs() or [DATA_DIR])[0]
 MODEL_DIRS = platforms.model_dirs()
@@ -35,7 +35,7 @@ DEFAULTS = {
     "no_speech_thold": 0.55,
     "vad_rms": 0.012,          # 语音门限（16bit 归一化后 RMS）
     "silence_flush_ms": 1200,  # 静音多久后切段
-    "max_segment_ms": 20000,   # 单段最长
+    "max_segment_ms": 12000,   # 单段最长
     "min_segment_ms": 700,     # 太短的丢弃
     "vad_noise_mult": 2.2,     # 自适应门限 = 底噪 × 该倍数
     "asr_prompt": (

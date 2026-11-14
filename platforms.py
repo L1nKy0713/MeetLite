@@ -96,6 +96,25 @@ def system_audio_allowed() -> bool:
 NATIVE_CAPTURE = IS_WIN
 
 
+def request_system_audio() -> bool:
+    """mac：主动向系统申请一次屏幕录制权限，让授权对话框真正弹出来。
+
+    ad-hoc 签名的应用每次重新构建，二进制指纹都会变，系统设置里那条旧授权
+    记录因此失效（仍然显示已勾选）。只做 preflight 检查永远不会触发弹窗，
+    必须调用一次 CGRequestScreenCaptureAccess()，系统才会为当前这份二进制
+    重新登记权限。返回是否已经拿到授权。"""
+    if IS_WIN:
+        return True
+    b = system_capture_bin()
+    if not b.is_file():
+        return False
+    try:
+        out = subprocess.run([str(b), "--request"], capture_output=True, timeout=60)
+        return out.stdout.decode("utf-8", "replace").strip() == "granted"
+    except Exception:
+        return False
+
+
 def system_capture_argv(rate: int) -> list[str]:
     return [str(system_capture_bin()), "--rate", str(rate)]
 

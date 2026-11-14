@@ -35,6 +35,7 @@ import updater
 import summarize as summarize_mod
 import trash as trash_mod
 from capture import Recorder, list_input_devices, system_audio_allowed
+import capture as capture_mod
 from llm import LocalLLM
 from whisper_engine import WhisperEngine
 
@@ -323,14 +324,19 @@ class App:
                 path,
                 on_note=lambda msg: self.broadcast(mid, {"type": "notice", "message": msg}),
             )
-            chunk_bytes = 16000 * 2 * 30
-            chunks = [pcm[i:i + chunk_bytes] for i in range(0, len(pcm), chunk_bytes)]
-            total = len(chunks)
+            # 按静音切句，而不是定长 30 秒：whisper 一次解码只有一种语言标签，
+            # 30 秒窗口里中英混说时非目标语言会被整段丢掉；按句子切之后每段基本
+            # 是单一语言，language=auto 才判得准。
+            segs = capture_mod.segment_pcm(
+                pcm,
+                max_ms=int(self.cfg.get("import_max_segment_ms", 12000)),
+                silence_ms=int(self.cfg.get("import_silence_ms", 600)),
+                gate_min=float(self.cfg.get("vad_rms", 0.012)),
+            )
+            total = len(segs)
             self.broadcast(mid, {"type": "progress", "phase": "import",
-                                 "text": f"共 {total} 段，开始转写", "ratio": 0})
-            for i, ch in enumerate(chunks, 1):
-                start_ms = (i - 1) * 30000
-                end_ms = start_ms + len(ch) * 1000 // 32000
+                                 "text": f"共 {total} 句，开始转写", "ratio": 0})
+            for i, (start_ms, end_ms, ch) in enumerate(segs, 1):
                 self.jobs.put(("chunk", mid, start_ms, end_ms, ch, total, i))
             self.jobs.put(("segment", mid, 0, 0, b""))  # 用空段作为队列哨兵
             self.broadcast(mid, {"type": "notice", "message": f"已提交 {total} 段转写"})
@@ -724,17 +730,27 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 if "NEED_SCREEN_PERMISSION" in str(e):
                     return self._json({"ok": False, "code": "need_screen_permission",
-                                       "error": "需要屏幕录制权限才能采集会议声音"}, 403)
+                                       "error": "需要屏幕录制权限：系统已弹出授权框，允许后请重新打开 MeetLite（设置里那条旧勾选可能是上一次构建留下的，重新勾一次即可）"}, 403)
                 return self._err(e)
 
         if p == "/api/open-privacy" and method == "POST":
             b = self._body()
             kind = b.get("kind") or "screen"
             pane = {"screen": "Privacy_ScreenCapture", "mic": "Privacy_Microphone"}.get(kind, "Privacy_ScreenCapture")
+            # 先申请一次：只有真正调用 CGRequestScreenCaptureAccess()，系统才会
+            # 为当前这份二进制登记授权并弹窗。光跳转到设置页，用户看到的是上一
+            # 次构建留下的旧记录（ad-hoc 签名换了指纹），勾着也照样录不到。
+            granted = False
+            if kind == "screen":
+                try:
+                    granted = platforms.request_system_audio()
+                except Exception:
+                    granted = False
+                app._perm_at = 0            # 让 /api/system 立刻重新探测
             try:
                 subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{pane}"],
                                check=False, timeout=10)
-                return self._json({"ok": True})
+                return self._json({"ok": True, "granted": granted})
             except Exception as e:
                 return self._err(e)
 

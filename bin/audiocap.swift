@@ -90,6 +90,22 @@ if CommandLine.arguments.contains("--check") {
     exit(0)
 }
 
+// --request：主动向系统申请屏幕录制权限。
+// 这条必须存在：应用每次重新构建后 ad-hoc 签名（CDHash）都会变，
+// 系统设置里那条旧记录虽然还显示「已勾选」，但 TCC 的 csreq 已经对不上新二进制，
+// 于是 preflight 返回 false 而用户完全看不出问题。只有真正调用一次
+// CGRequestScreenCaptureAccess()，系统才会为当前二进制登记权限并弹出对话框。
+if CommandLine.arguments.contains("--request") {
+    let ok = CGPreflightScreenCaptureAccess()
+    if ok {
+        print("granted")
+        exit(0)
+    }
+    let granted = CGRequestScreenCaptureAccess()
+    print(granted ? "granted" : "requested")
+    exit(0)
+}
+
 guard CGPreflightScreenCaptureAccess() else {
     _ = CGRequestScreenCaptureAccess()
     die("NEED_SCREEN_PERMISSION")
