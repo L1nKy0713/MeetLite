@@ -1,21 +1,20 @@
 {
-  "version": "1.4.8",
+  "version": "1.4.9",
   "published": "2026-11-14",
   "notes": [
-    "权限：修「系统设置里勾了屏幕录制，MeetLite 仍然录不到系统声」。真实原因是条目失效——应用是 ad-hoc 签名，每次重新构建二进制指纹都变，系统里那条旧授权记录还显示开着，但对新二进制已经不生效，而旧代码只做权限检查、从不主动申请，系统弹窗因此永远不出现。",
-    "现在点「去授权」会真正调用一次系统申请接口，弹出授权框并按当前二进制重新登记；录不到系统声时也会自动触发这次申请，而不是只给一句提示。",
-    "授权后需要重启 MeetLite 才能生效（macOS 对屏幕录制的限制，不是程序能绕过的）。",
-    "排查过程实测：重置授权 → 重新授权 → 录「仅系统声」播放语音，得到正确转写（中文句完整），确认采集链路正常。",
-    "macOS 与 Windows 同步到 1.4.8。"
+    "签名：改成固定的 designated requirement（只认 bundle id app.meetlite.local），不再按二进制指纹记账。",
+    "修复：更新或重新打包后，系统「录屏与系统录音」里的授权不会再静默失效，不用每次重新授权。",
+    "说明：首次安装、或之前授权已被清掉时，仍需在系统设置里手动添加并勾选一次（macOS 对屏幕录制不弹窗申请）。",
+    "Windows 包同步版本号，功能与 1.4.8 一致。"
   ],
   "macos": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.8/MeetLite-1.4.8.zip",
-    "size": 1116639,
-    "sha256": "afe4b396f2bc97f62d92bb72ee1942f9960907f395e950233350b28a200fad9e"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.9/MeetLite-1.4.9.zip",
+    "size": 1116660,
+    "sha256": "cca33a0187f87792f19cb9720ae278765d8116424698cee0da222d13b9cb7336"
   },
   "windows": {
-    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.8/MeetLite-1.4.8-win.zip",
-    "size": 24249512,
-    "sha256": "acd6af73ef62c4811b15502b71073fb769df13a04c83cd4bb8a8e759d9f33785"
+    "url": "https://github.com/L1nKy0713/MeetLite/releases/download/v1.4.9/MeetLite-1.4.9-win.zip",
+    "size": 24249511,
+    "sha256": "bb6e60af8a803f612a2e3e38c5b0f37235cbea3d0472916077eaa2afd5d5c4b5"
   }
 }

@@ -51,8 +51,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
-echo "› 签名（ad-hoc）"
-codesign --force --deep --sign - "$APP" 2>/dev/null || echo "  跳过签名"
+# 签名：优先用稳定的本机自签身份；没有就用 ad-hoc，但必须显式写死
+# designated requirement，否则系统按 cdhash 记账——每次重新构建指纹都变，
+# 「设置 → 隐私与安全性 → 录屏与系统录音」里那条授权就变成勾着也无效，
+# 用户必须重新授权。把 DR 固定成只认 bundle id，重建后系统才认得出是同一个应用。
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"MeetLite[^"]*"' | head -1 | tr -d '"' || true)
+if [ -n "$IDENTITY" ]; then
+  echo "› 签名（$IDENTITY）"
+  codesign --force --deep --sign "$IDENTITY" --identifier app.meetlite.local "$APP" || \
+    codesign --force --deep --sign - --identifier app.meetlite.local \
+      -r='designated => identifier "app.meetlite.local"' "$APP"
+else
+  echo "› 签名（ad-hoc，固定 designated requirement）"
+  codesign --force --deep --sign - --identifier app.meetlite.local \
+    -r='designated => identifier "app.meetlite.local"' "$APP" 2>/dev/null || echo "  跳过签名"
+fi
 
 echo "✓ 完成: $(pwd)/$APP"
 du -sh "$APP"
